@@ -500,6 +500,156 @@ canvas {
   white-space: nowrap;
 }
 
+.agent-bottom-controls {
+  position: absolute;
+  z-index: 1000;
+  bottom: 26px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+}
+
+.variant-controls,
+.glow-toggle {
+  border: 1px solid var(--control-border);
+  background: var(--control-surface);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 10px 28px rgba(0, 0, 0, 0.22);
+  -webkit-backdrop-filter: blur(16px) saturate(135%);
+  backdrop-filter: blur(16px) saturate(135%);
+}
+
+.variant-controls {
+  display: flex;
+  gap: 1px;
+  padding: 3px;
+  border-radius: 999px;
+}
+
+.variant-controls button,
+.glow-toggle {
+  display: grid;
+  width: 25px;
+  height: 23px;
+  padding: 0;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--control-muted);
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.variant-controls button {
+  border: 0;
+  background: transparent;
+}
+
+.variant-controls button.is-active,
+.glow-toggle.is-active {
+  color: #0a0506;
+  background: #d9ff2f;
+}
+
+.theme--light .variant-controls button.is-active,
+.theme--light .glow-toggle.is-active {
+  color: #ffffff;
+  background: #0a0506;
+}
+
+.glow-toggle {
+  width: 31px;
+  height: 31px;
+}
+
+.glow-toggle > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 7px currentColor;
+}
+
+.variant-glyph {
+  position: relative;
+  display: flex;
+  width: 12px;
+  height: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.variant-glyph--auto {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.variant-glyph--auto > span,
+.variant-glyph--globe > span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.variant-glyph--auto > span {
+  position: absolute;
+  top: -2px;
+  right: 0;
+}
+
+.variant-glyph--agent {
+  gap: 2px;
+}
+
+.variant-glyph--agent > span {
+  width: 2px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.variant-glyph--globe {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.variant-glyph--cube {
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.variant-glyph--cube > span {
+  display: none;
+}
+
+.variant-glyph--fast {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.variant-glyph--fast > span {
+  width: 10px;
+  height: 1px;
+  background: currentColor;
+}
+
+.variant-glyph--fast > span:nth-child(2) {
+  width: 7px;
+}
+
+.variant-glyph--fast > span:nth-child(3) {
+  width: 4px;
+}
+
 .detail-controls {
   position: absolute;
   z-index: 1000;
@@ -517,6 +667,19 @@ canvas {
   transform: translateX(-50%);
   -webkit-backdrop-filter: blur(16px) saturate(135%);
   backdrop-filter: blur(16px) saturate(135%);
+}
+
+.unified-agent-page .detail-controls {
+  position: static;
+  bottom: auto;
+  left: auto;
+  transform: none;
+}
+
+.variant-controls button:focus-visible,
+.glow-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .detail-controls button {

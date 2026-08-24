@@ -19,7 +19,9 @@ The eyes blink by collapsing vertically and become circular nodes before the
 agent reorganizes. Each cycle alternates the face with one randomly selected
 clean globe, rotating cube, or fast thinking state, then always returns to the
 face before choosing another state. Fast mode keeps the eyed sphere but rotates
-the field at four times normal speed and narrows the eyes.
+the field at seven times normal speed, narrows the eyes asymmetrically, moves
+the eye group with the accelerated field, and leaves short persistence trails.
+The cube uses an even golden-angle distribution projected onto all six faces.
 
 All light-mode geometry uses pure black. Depth and hierarchy come from particle
 size: dots are smallest near the projected center and become larger toward the
@@ -31,6 +33,14 @@ The restored `1×`, `2×`, and `4×` controls present the agent at approximately
 80 × 80, 160 × 160, and 320 × 320 CSS pixels. The Canvas backing buffer follows
 device density so each physical scale stays crisp. The original light/dark,
 sound, and view controls remain above it.
+
+A compact bottom state console sits beside the size selector. `Auto`, face,
+globe, cube, and fast toggles allow direct navigation; manual variants hold
+until another option is chosen. A separate glow toggle adds a faint lime halo.
+Clicking the canvas gives every node a radial and tangential impulse, reduces
+spring stiffness momentarily, and reunites the full system after one second.
+Cursor movement shifts and tilts the eye pair as a group, with periodic
+one-eye-open/one-eye-narrow expressions.
 
 ## Compact studies
 
