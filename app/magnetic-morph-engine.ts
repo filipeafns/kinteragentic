@@ -475,41 +475,54 @@ function agentEyeTargets(
   mode: 'agent-round' | 'agent-tall' | 'agent-long',
 ): Vec3[] {
   const dimensions = {
-    'agent-round': { x: 2.75, y: 2.75 },
-    'agent-tall': { x: 1.45, y: 4.25 },
-    'agent-long': { x: 4.15, y: 1.5 },
+    'agent-round': { x: 2.35, y: 2.35 },
+    'agent-tall': { x: 1.2, y: 3.5 },
+    'agent-long': { x: 3.5, y: 1.2 },
   }[mode];
   const pointerFresh = performance.now() - POINTER_GAZE.lastMove < 2400;
-  const automaticX = Math.sin(phase * 1.08 + variant * 0.73);
+  const automaticX = Math.sin(phase * 1.18 + variant * 0.73);
   const automaticY = Math.sin(phase * 0.61 + variant * 1.11) * 0.38;
-  const gazeX = (pointerFresh ? POINTER_GAZE.x : automaticX) * 1.55;
-  const gazeY = (pointerFresh ? POINTER_GAZE.y : automaticY) * 0.72;
+  const gazeX = (pointerFresh ? POINTER_GAZE.x : automaticX) * 1.9;
+  const gazeY = (pointerFresh ? POINTER_GAZE.y : automaticY) * 0.84;
   const blinkSignal = Math.max(0, (Math.cos(phase * 1.8 + variant * 1.37) - 0.955) / 0.045);
   const eyeHeight = dimensions.y * (1 - Math.min(1, blinkSignal) * 0.84);
 
   return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
-    if (index < 52) {
-      const eye = index < 26 ? 0 : 1;
-      const localIndex = index % 26;
-      const radius = Math.sqrt((localIndex + 0.45) / 26);
+    if (index < 20) {
+      const eye = index < 10 ? 0 : 1;
+      const localIndex = index % 10;
+      const radius = Math.pow((localIndex + 0.55) / 10, 1.35);
       const angle = localIndex * GOLDEN_ANGLE + eye * 0.24;
       return {
-        size: 0.54 + hash(index * 2.17 + variant * 19) * 0.3,
-        tone: 0.015 + hash(index + variant) * 0.08,
-        x: (eye === 0 ? -5.15 : 5.15) + gazeX + Math.cos(angle) * radius * dimensions.x,
+        size: 0.46 + hash(index * 2.17 + variant * 19) * 0.2,
+        tone: 0.01 + hash(index + variant) * 0.055,
+        x: (eye === 0 ? -4.65 : 4.65) + gazeX + Math.cos(angle) * radius * dimensions.x,
         y: gazeY + Math.sin(angle) * radius * eyeHeight,
         z: 0,
       };
     }
 
-    const localIndex = index - 52;
-    const angle = (localIndex / 20) * TAU + phase * 0.06;
-    const pulse = 1 + Math.sin(phase * 0.7 + localIndex * 0.43 + variant) * 0.035;
+    if (index < 50) {
+      const localIndex = index - 20;
+      const radius = Math.pow((localIndex + 0.7) / 30, 1.5);
+      const angle = localIndex * GOLDEN_ANGLE + variant * 0.31 + phase * 0.045;
+      return {
+        size: 0.28 + hash(index * 2.73 + variant * 17) * 0.28,
+        tone: 0.58 + hash(index * 0.83 + variant) * 0.3,
+        x: Math.cos(angle) * radius * 8.9,
+        y: Math.sin(angle) * radius * 6.9,
+        z: 0,
+      };
+    }
+
+    const localIndex = index - 50;
+    const angle = (localIndex / 22) * TAU + phase * 0.045;
+    const pulse = 1 + Math.sin(phase * 0.64 + localIndex * 0.39 + variant) * 0.025;
     return {
-      size: 0.4 + hash(index * 3.13 + variant * 29) * 0.34,
-      tone: 0.42 + hash(index * 0.91 + variant) * 0.38,
-      x: Math.cos(angle) * 11.4 * pulse,
-      y: Math.sin(angle) * 9.5 / pulse,
+      size: 0.34 + hash(index * 3.13 + variant * 29) * 0.26,
+      tone: 0.38 + hash(index * 0.91 + variant) * 0.34,
+      x: Math.cos(angle) * 11.25 * pulse,
+      y: Math.sin(angle) * 9.35 / pulse,
       z: 0,
     };
   });

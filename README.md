@@ -24,8 +24,9 @@ assigned signatures.
 ## Sentient particle states
 
 Every study now includes one agent state made from the same 72 particles as its
-other forms. The particles gather into round, tall, or long paired eye masses
-inside a sparse face orbit, blink in orchestration, follow recent pointer
+other forms. Twenty particles form the two light, center-weighted eyes, 30 make
+a compact low-contrast diffusion field, and 22 balance the outer face orbit.
+The round, tall, or long eyes blink in orchestration, follow recent pointer
 movement, and return to autonomous side-to-side glances when the pointer is
 idle. There are no overlaid eye graphics or cross-fades. Spreadsheet and data
 sequences also pass through a particle-built three-row checklist.
