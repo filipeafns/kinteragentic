@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://magnetic-morph-studies.filipeafns.chatgpt.site'),
+  metadataBase: new URL('https://kinteragentic.vercel.app'),
   title: 'Magnetic Morph Studies',
   description:
     'A unified spherical particle agent rotates, blinks into a globe, and reorganizes into task forms.',
@@ -32,9 +32,15 @@ export const metadata: Metadata = {
   robots: {
     index: false,
     follow: false,
+    noarchive: true,
+    nosnippet: true,
+    noimageindex: true,
     googleBot: {
       index: false,
       follow: false,
+      noarchive: true,
+      nosnippet: true,
+      noimageindex: true,
     },
   },
   twitter: {
