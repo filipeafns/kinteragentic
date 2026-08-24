@@ -24,6 +24,72 @@ body {
   overflow: hidden;
 }
 
+.unified-agent-page {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.unified-agent-stage {
+  width: min(76vw, 68svh, 520px);
+  aspect-ratio: 1;
+}
+
+.unified-agent-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1;
+  background: #ffffff;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.unified-agent-studies {
+  position: absolute;
+  right: 24px;
+  bottom: 22px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  grid-template-columns: repeat(2, 4px);
+  grid-template-rows: repeat(2, 4px);
+  place-content: center;
+  gap: 3px;
+  border: 0;
+  border-radius: 999px;
+  color: #000000;
+  background: transparent;
+}
+
+.unified-agent-studies span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  transition: transform 220ms ease;
+}
+
+.unified-agent-studies:hover span:nth-child(1),
+.unified-agent-studies:hover span:nth-child(4) {
+  transform: scale(1.5);
+}
+
+.unified-agent-studies:focus-visible {
+  outline: 1px solid #000000;
+  outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .unified-agent-stage {
+    width: min(88vw, 62svh);
+  }
+}
+
 button,
 canvas {
   -webkit-tap-highlight-color: transparent;
@@ -328,6 +394,7 @@ canvas {
   flex: 0 0 auto;
   width: calc(40px * var(--detail-scale));
   height: calc(40px * var(--detail-scale));
+  aspect-ratio: 1;
   background: var(--surface);
 }
 

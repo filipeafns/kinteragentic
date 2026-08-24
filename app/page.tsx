@@ -1,5 +1,5 @@
-import { MorphGallery } from './MorphGallery';
+import { UnifiedAgent } from './UnifiedAgent';
 
 export default function Home() {
-  return <MorphGallery />;
+  return <UnifiedAgent />;
 }

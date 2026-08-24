@@ -78,9 +78,9 @@ const BACKGROUNDS: Record<MagneticTheme, Record<MagneticSurface, string>> = {
     card: '#141208',
   },
 };
-const PALETTES: Record<MagneticTheme, string[]> = {
-  light: ['#323232', '#505050', '#747474', '#989898', '#b8b8b8'],
-  dark: ['#D9FF2F', '#B8D929', '#91AA22', '#697B1B', '#424D13'],
+const PARTICLE_COLORS: Record<MagneticTheme, string> = {
+  light: '#000000',
+  dark: '#D9FF2F',
 };
 
 const POINTER_GAZE = {
@@ -815,15 +815,14 @@ export class MagneticMorphEngine {
 
   private draw() {
     const context = this.context;
-    const palette = PALETTES[this.theme];
     context.fillStyle = BACKGROUNDS[this.theme][this.surface];
     context.fillRect(0, 0, 40, 40);
 
     const ordered = [...this.particles].sort((a, b) => a.size - b.size);
+    context.fillStyle = PARTICLE_COLORS[this.theme];
     for (const particle of ordered) {
-      const paletteIndex = Math.round(clamp(particle.tone, 0, 1) * (palette.length - 1));
-      const radius = clamp(particle.size, 0.38, 1.14);
-      context.fillStyle = palette[paletteIndex];
+      const neutralScale = 1 - clamp(particle.tone, 0, 1) * 0.52;
+      const radius = clamp(particle.size * neutralScale, 0.2, 1.14);
       context.beginPath();
       context.arc(particle.x, particle.y, radius, 0, TAU);
       context.fill();

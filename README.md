@@ -1,15 +1,41 @@
 # Magnetic Morph Studies
 
-Twelve 40 × 40 pixel Canvas 2D studies that continuously reorganize one fixed
-set of opaque particles into data forms, geometric solids, and amorphic forms.
-The experience opens in light mode and grid view. It also retains the dark
-`#0A0506` theme with solid `#D9FF2F` accents and adapts the Shipium spatial-wheel
-mechanic into an autoplaying carousel. A glass control switches between themes
-and grid/carousel views.
+A centered Canvas 2D agent built from one fixed set of particles. The primary
+page is a single white field with a spherical black agent; the original twelve
+40 × 40 studies now live at `/studies` with their grid and carousel controls.
 
-## Layered interaction audio
+## Unified spherical agent
 
-The site uses `cuelume@0.2.2`. Cuelume contains no recorded audio assets to
+The primary agent owns 64 particles for its entire cycle. Forty-four particles
+make the spherical field and 20 tightly overlap into two tall oval eye masses.
+The eye masses rotate around the same 3D sphere, compress at its silhouette,
+pass behind the front particles, and reappear on the opposite side. They still
+respond subtly to pointer position and the complete field repels locally on
+hover.
+
+Every four seconds the eye particles close into their corresponding globe
+positions, so a blink resolves into a complete spinning sphere instead of an
+overlaid eyelid. Between larger forms the whole globe contracts inward. Forty-
+eight particles then move forward into a checklist, waveform, or rotating
+pyramid while 16 remain as a small rear sphere.
+
+All visible geometry uses pure black. Depth and hierarchy come from particle
+size: dots are smallest near the projected center and become larger toward the
+spherical silhouette. Rear-hemisphere fog is the sole opacity treatment,
+ranging from 30% at the back to fully opaque at the front. Every rendered dot
+is a true Canvas circle; the oval eyes exist only because circles overlap.
+
+## Compact studies
+
+The secondary `/studies` page continuously reorganizes fixed 72-particle sets
+into data forms, geometric solids, and amorphic forms. It opens in light mode
+and grid view, retains the earlier dark `#0A0506` and accent `#D9FF2F` theme,
+and includes the autoplaying spatial carousel. In light mode every dot is now
+pure black; neutral depth values reduce particle size rather than tinting gray.
+
+## Layered interaction audio in the studies
+
+The secondary studies use `cuelume@0.2.2`. Cuelume contains no recorded audio assets to
 extract: its 17 cues are synthesized at playback time with one shared Web Audio
 context. Each study has a deliberately quiet signature made from two cues on
 mouse hover and three staggered cues when it becomes the selected carousel
@@ -62,19 +88,19 @@ cross-dissolved during a morph.
 
 At every state change:
 
-1. The next form produces 72 target positions, sizes, and gray-tone values.
+1. The next form produces 72 target positions, sizes, and depth values.
 2. A greedy nearest-target pass maps the current particles to the new form,
    limiting unnecessary crossings in the tiny container.
 3. Each particle receives a deterministic activation delay and a small lateral
    velocity, creating the reference video's loose reorganization without its
    pendulum wipe.
-4. Position, size, and tone converge independently through damped springs.
+4. Position, size, and depth converge independently through damped springs.
 5. Rotating forms keep their target identity while their 3D projection moves,
    so cube and sphere rotation remains coherent after the morph settles.
 
-The canvas uses an opaque rendering context, paints a solid white background on
-every frame, and draws each dot with one of five solid gray values. Dot-size
-variation carries depth and hierarchy instead of opacity.
+The compact canvas uses an opaque rendering context, paints a solid background
+on every frame, and draws each light-mode dot in pure black. Dot-size variation
+carries neutral hierarchy instead of gray tint.
 
 ## Form generators
 

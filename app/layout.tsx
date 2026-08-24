@@ -16,16 +16,16 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://magnetic-morph-studies.filipeafns.chatgpt.site'),
   title: 'Magnetic Morph Studies',
   description:
-    'Twelve magnetic particle agents morph through sentient eye states, data forms, and geometric solids.',
+    'A unified spherical particle agent rotates, blinks into a globe, and reorganizes into task forms.',
   openGraph: {
     title: 'Magnetic Morph Studies',
-    description: 'Sentient eye states and opaque particle reorganization across twelve magnetic studies.',
+    description: 'A unified spherical particle agent with rotating eyes and size-driven depth.',
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Lime particle forms arranged in a curved dark carousel beneath the title Magnetic Morph Studies',
+        alt: 'A black spherical particle agent with oval eyes on a white background',
       },
     ],
   },
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Magnetic Morph Studies',
-    description: 'Sentient eye states and opaque particle reorganization across twelve magnetic studies.',
+    description: 'A unified spherical particle agent with rotating eyes and size-driven depth.',
     images: ['/og.png'],
   },
 };
