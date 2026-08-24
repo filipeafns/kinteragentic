@@ -1,26 +1,77 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color: #363636;
+  background: #ffffff;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  width: 100%;
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+  background: #ffffff;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  overflow: hidden;
+}
+
+canvas {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.morph-page {
+  display: grid;
+  width: 100%;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.morph-gallery {
+  display: grid;
+  grid-template-columns: repeat(6, 40px);
+  align-items: center;
+  justify-content: center;
+  gap: clamp(26px, 4.4vw, 58px);
+  padding: 40px;
+}
+
+.morph-study {
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  overflow: hidden;
+  background: #ffffff;
+  contain: strict;
+}
+
+.morph-canvas {
+  display: block;
+  width: 40px;
+  height: 40px;
+  background: #ffffff;
+}
+
+@media (max-width: 620px) {
+  .morph-gallery {
+    grid-template-columns: repeat(3, 40px);
+    gap: 42px 52px;
+    padding: 32px;
+  }
+}
+
+@media (max-width: 380px) {
+  .morph-gallery {
+    gap: 36px 40px;
+  }
 }
