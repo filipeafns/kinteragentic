@@ -35,6 +35,7 @@ const FOREGROUND_COUNT = 22;
 const FACE_DURATION = 11_500;
 const SHAPE_DURATION = 3_900;
 const FACE_SPHERE_RADIUS = 42;
+const EYE_ARRIVAL_DURATION = 1_100;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
 const RANDOM_SHAPES: AgentScene[] = ['globe', 'checklist', 'wave', 'pyramid'];
@@ -102,37 +103,21 @@ function blinkAmount(localTime: number) {
   return 0;
 }
 
-function orbitAngle(localTime: number) {
-  const start = 4.1;
-  const end = 9.45;
-  const restingWobble = Math.sin(localTime * 0.62) * 0.07;
-  if (localTime <= start) return restingWobble;
-  if (localTime >= end) return Math.sin((localTime - end) * 0.72) * 0.055;
-  return ease((localTime - start) / (end - start)) * TAU;
-}
-
 function eyeTargets(localTime: number, gazeY: number): Target[] {
-  const rotation = orbitAngle(localTime);
   const blink = blinkAmount(localTime);
-  const normalX = Math.sin(rotation);
-  const normalZ = Math.cos(rotation);
-  const tangentX = Math.cos(rotation);
-  const tangentZ = -Math.sin(rotation);
-  const faceDepth = 20;
-  const front = clamp((normalZ + 1) * 0.5, 0, 1);
-  const horizontalCompression = 0.2 + Math.abs(tangentX) * 0.8;
+  const arrival = ease(localTime / (EYE_ARRIVAL_DURATION * 0.001));
 
   return [-12.2, 12.2].map((offset): Target => ({
-    alpha: 0.3 + front * 0.7,
-    radiusX: 5.05 * horizontalCompression,
-    radiusY: mix(12.35, 1.35, blink),
-    x: normalX * faceDepth + tangentX * offset,
+    alpha: 1,
+    radiusX: mix(1.4, 5.05, arrival),
+    radiusY: mix(1.4, mix(12.35, 1.35, blink), arrival),
+    x: offset * arrival,
     y: -1 + gazeY * 0.65 + Math.sin(localTime * 0.76) * 0.35,
-    z: normalZ * faceDepth + tangentZ * offset,
+    z: FACE_SPHERE_RADIUS + 4,
   }));
 }
 
-function avoidEyes(target: Target, eyes: Target[], index: number): Target {
+function avoidEyes(target: Target, eyes: Target[], index: number, protection: number): Target {
   let x = target.x;
   let y = target.y;
 
@@ -153,7 +138,7 @@ function avoidEyes(target: Target, eyes: Target[], index: number): Target {
     const gradientLength = Math.max(0.001, Math.hypot(gradientX, gradientY));
     const normalX = gradientX / gradientLength;
     const normalY = gradientY / gradientLength;
-    const strength = Math.pow(1 - distance, 1.7);
+    const strength = Math.pow(1 - distance, 1.7) * protection;
     x += (normalX - normalY * 0.32) * strength * 10.5;
     y += (normalY + normalX * 0.32) * strength * 10.5;
   }
@@ -161,27 +146,33 @@ function avoidEyes(target: Target, eyes: Target[], index: number): Target {
   return { ...target, x, y };
 }
 
-function flowingRingTargets(localTime: number, eyes: Target[]): Target[] {
-  const rotation = localTime * 0.255;
+function fullSphereTargets(localTime: number, eyes: Target[]): Target[] {
+  const rotation = localTime * 0.78;
   const cosine = Math.cos(rotation);
   const sine = Math.sin(rotation);
-  const wobbleEnvelope = ease(localTime / 1.15);
+  const tilt = 0.24 + Math.sin(localTime * 0.31) * 0.08;
+  const tiltCosine = Math.cos(tilt);
+  const tiltSine = Math.sin(tilt);
+  const protection = ease(localTime / (EYE_ARRIVAL_DURATION * 0.001));
 
-  return REFERENCE_RING.map(([mappedX, mappedY, mappedRadius], index): Target => {
-    const baseX = mappedX - CENTER;
-    const baseY = mappedY - CENTER;
-    const baseZ = Math.sqrt(
-      Math.max(0, FACE_SPHERE_RADIUS * FACE_SPHERE_RADIUS - baseX * baseX - baseY * baseY),
-    );
+  return REFERENCE_RING.map(([, , mappedRadius], index): Target => {
+    const normalizedY = 1 - ((index + 0.5) / REFERENCE_RING.length) * 2;
+    const ringRadius = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY));
+    const angle = index * GOLDEN_ANGLE;
+    const baseX = Math.cos(angle) * ringRadius * FACE_SPHERE_RADIUS;
+    const baseY = normalizedY * FACE_SPHERE_RADIUS;
+    const baseZ = Math.sin(angle) * ringRadius * FACE_SPHERE_RADIUS;
     const rotatedX = baseX * cosine + baseZ * sine;
     const rotatedZ = -baseX * sine + baseZ * cosine;
-    const depth = clamp((rotatedZ / FACE_SPHERE_RADIUS + 1) * 0.5, 0, 1);
-    const perspective = 1 + (rotatedZ / FACE_SPHERE_RADIUS) * 0.065;
-    const wobble = Math.sin(localTime * (0.72 + (index % 4) * 0.055) + index * 1.91);
-    const x = rotatedX * perspective;
-    const y = (baseY + wobble * 1.15 * wobbleEnvelope) * perspective;
+    const rotatedY = baseY * tiltCosine - rotatedZ * tiltSine;
+    const tiltedZ = baseY * tiltSine + rotatedZ * tiltCosine;
+    const depth = clamp((tiltedZ / FACE_SPHERE_RADIUS + 1) * 0.5, 0, 1);
+    const perspective = 1 + (tiltedZ / FACE_SPHERE_RADIUS) * 0.075;
+    const wobble = Math.sin(localTime * (1.18 + (index % 4) * 0.08) + index * 1.91);
+    const x = (rotatedX + wobble * 0.7) * perspective;
+    const y = (rotatedY + wobble * 0.9) * perspective;
     const edge = clamp(Math.hypot(x, y) / FACE_SPHERE_RADIUS, 0, 1);
-    const radius = mappedRadius * (0.62 + edge * 0.38) * (0.94 + depth * 0.06);
+    const radius = mappedRadius * (0.56 + edge * 0.46) * (0.9 + depth * 0.1);
 
     return avoidEyes(
       {
@@ -190,17 +181,18 @@ function flowingRingTargets(localTime: number, eyes: Target[]): Target[] {
         radiusY: radius,
         x,
         y,
-        z: rotatedZ,
+        z: tiltedZ,
       },
       eyes,
       index,
+      protection,
     );
   });
 }
 
 function referenceAgentTargets(localTime: number, gazeY: number): Target[] {
   const eyes = eyeTargets(localTime, gazeY);
-  const ring = flowingRingTargets(localTime, eyes);
+  const ring = fullSphereTargets(localTime, eyes);
 
   return [...eyes, ...ring];
 }
@@ -411,7 +403,7 @@ export class UnifiedAgentEngine {
   private repel = { active: false, strength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
   private scene: AgentScene = 'agent';
-  private sceneStarted = performance.now();
+  private sceneStarted = performance.now() - EYE_ARRIVAL_DURATION;
   private theme: UnifiedAgentTheme;
 
   constructor(
@@ -424,7 +416,7 @@ export class UnifiedAgentEngine {
     this.context = context;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const firstTargets = referenceAgentTargets(0, 0);
+    const firstTargets = referenceAgentTargets(EYE_ARRIVAL_DURATION * 0.001, 0);
     this.nodes = firstTargets.map((target, index) => ({
       ...target,
       activation: 0,

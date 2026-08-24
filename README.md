@@ -6,12 +6,13 @@ page is a single white field with a spherical black agent; the original twelve
 
 ## Unified spherical agent
 
-The primary agent uses 26 circles mapped directly from the supplied reference
-plus two separate solid ellipse nodes. The circles continuously rotate across a
-shallow spherical shell, wobble independently, and flow around soft elliptical
-exclusion areas surrounding the eyes. The eyes dwell front-facing, then make a
-controlled 360-degree orbit with the same depth, silhouette compression, and
-rear fog as the field. The complete composition still repels locally on hover.
+The primary agent uses 26 circles plus two separate solid ellipse nodes. The
+circles are distributed across a complete Fibonacci sphere, including both the
+front and rear hemispheres, then rotate quickly with a gentle secondary tilt
+and independent wobble. The eyes remain fixed in the center. As they arrive,
+two soft elliptical exclusion areas grow with them and redirect only the nearby
+circles, creating the protected face without flattening the rest of the globe.
+The complete composition still repels locally on hover.
 
 The eyes blink by collapsing vertically and become circular nodes before the
 agent reorganizes. Each cycle alternates the face with one randomly selected
