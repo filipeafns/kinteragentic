@@ -46,7 +46,7 @@ export function UnifiedAgent() {
   const engineRef = useRef<UnifiedAgentEngine | null>(null);
   const [detail, setDetail] = useState<UnifiedAgentDetail>(1);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [theme, setTheme] = useState<UnifiedAgentTheme>('light');
+  const [theme, setTheme] = useState<UnifiedAgentTheme>('dark');
   const initialDetail = useRef(detail);
   const initialTheme = useRef(theme);
   const stageSize = detail * 80;

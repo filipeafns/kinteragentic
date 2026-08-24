@@ -1,7 +1,7 @@
 export type UnifiedAgentTheme = 'light' | 'dark';
 export type UnifiedAgentDetail = 1 | 2 | 4;
 
-type AgentScene = 'agent' | 'globe' | 'checklist' | 'wave' | 'pyramid';
+type AgentScene = 'agent' | 'globe' | 'cube' | 'fast';
 
 type Target = {
   alpha: number;
@@ -31,14 +31,13 @@ const CENTER = LOGICAL_SIZE / 2;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const NODE_COUNT = 28;
-const FOREGROUND_COUNT = 22;
 const FACE_DURATION = 11_500;
 const SHAPE_DURATION = 3_900;
 const FACE_SPHERE_RADIUS = 42;
 const EYE_ARRIVAL_DURATION = 1_100;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
-const RANDOM_SHAPES: AgentScene[] = ['globe', 'checklist', 'wave', 'pyramid'];
+const RANDOM_SHAPES: AgentScene[] = ['globe', 'cube', 'fast'];
 
 const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
   light: { background: '#FFFFFF', particle: '#000000' },
@@ -103,16 +102,17 @@ function blinkAmount(localTime: number) {
   return 0;
 }
 
-function eyeTargets(localTime: number, gazeY: number): Target[] {
+function eyeTargets(localTime: number, gazeX: number, gazeY: number, thinking = false): Target[] {
   const blink = blinkAmount(localTime);
   const arrival = ease(localTime / (EYE_ARRIVAL_DURATION * 0.001));
+  const closure = Math.max(blink, thinking ? 0.58 : 0);
 
   return [-12.2, 12.2].map((offset): Target => ({
     alpha: 1,
     radiusX: mix(1.4, 5.05, arrival),
-    radiusY: mix(1.4, mix(12.35, 1.35, blink), arrival),
-    x: offset * arrival,
-    y: -1 + gazeY * 0.65 + Math.sin(localTime * 0.76) * 0.35,
+    radiusY: mix(1.4, mix(12.35, 2.8, closure), arrival),
+    x: offset * arrival + gazeX * 2.2,
+    y: -1 + gazeY * 1.8 + Math.sin(localTime * 0.76) * 0.35,
     z: FACE_SPHERE_RADIUS + 4,
   }));
 }
@@ -146,14 +146,15 @@ function avoidEyes(target: Target, eyes: Target[], index: number, protection: nu
   return { ...target, x, y };
 }
 
-function fullSphereTargets(localTime: number, eyes: Target[]): Target[] {
-  const rotation = localTime * 0.78;
+function fullSphereTargets(localTime: number, eyes: Target[], speed = 1): Target[] {
+  const motionTime = localTime * speed;
+  const rotation = motionTime * 0.78;
   const cosine = Math.cos(rotation);
   const sine = Math.sin(rotation);
-  const tilt = 0.24 + Math.sin(localTime * 0.31) * 0.08;
+  const tilt = 0.24 + Math.sin(motionTime * 0.31) * 0.08;
   const tiltCosine = Math.cos(tilt);
   const tiltSine = Math.sin(tilt);
-  const protection = ease(localTime / (EYE_ARRIVAL_DURATION * 0.001));
+  const protection = clamp((eyes[0].radiusX - 1.4) / (5.05 - 1.4), 0, 1);
 
   return REFERENCE_RING.map(([, , mappedRadius], index): Target => {
     const normalizedY = 1 - ((index + 0.5) / REFERENCE_RING.length) * 2;
@@ -168,7 +169,7 @@ function fullSphereTargets(localTime: number, eyes: Target[]): Target[] {
     const tiltedZ = baseY * tiltSine + rotatedZ * tiltCosine;
     const depth = clamp((tiltedZ / FACE_SPHERE_RADIUS + 1) * 0.5, 0, 1);
     const perspective = 1 + (tiltedZ / FACE_SPHERE_RADIUS) * 0.075;
-    const wobble = Math.sin(localTime * (1.18 + (index % 4) * 0.08) + index * 1.91);
+    const wobble = Math.sin(motionTime * (1.18 + (index % 4) * 0.08) + index * 1.91);
     const x = (rotatedX + wobble * 0.7) * perspective;
     const y = (rotatedY + wobble * 0.9) * perspective;
     const edge = clamp(Math.hypot(x, y) / FACE_SPHERE_RADIUS, 0, 1);
@@ -190,9 +191,17 @@ function fullSphereTargets(localTime: number, eyes: Target[]): Target[] {
   });
 }
 
-function referenceAgentTargets(localTime: number, gazeY: number): Target[] {
-  const eyes = eyeTargets(localTime, gazeY);
-  const ring = fullSphereTargets(localTime, eyes);
+function referenceAgentTargets(
+  localTime: number,
+  gazeX: number,
+  gazeY: number,
+  speed = 1,
+  thinking = false,
+  arrived = false,
+): Target[] {
+  const eyeTime = localTime + (arrived ? EYE_ARRIVAL_DURATION * 0.001 : 0);
+  const eyes = eyeTargets(eyeTime, gazeX, gazeY, thinking);
+  const ring = fullSphereTargets(localTime, eyes, speed);
 
   return [...eyes, ...ring];
 }
@@ -235,137 +244,74 @@ function globeTargets(absoluteTime: number, scale: number): Target[] {
   });
 }
 
-function coreTargets(absoluteTime: number): Target[] {
-  return Array.from({ length: NODE_COUNT - FOREGROUND_COUNT }, (_, index) => {
-    const normalizedY = 1 - (index / (NODE_COUNT - FOREGROUND_COUNT - 1)) * 2;
-    const ring = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY));
-    const angle = index * GOLDEN_ANGLE + absoluteTime * 0.54;
-    const edge = Math.hypot(Math.cos(angle) * ring, normalizedY);
-    const radius = 0.72 + edge * 0.7;
-    return {
-      alpha: 0.3,
-      radiusX: radius,
-      radiusY: radius,
-      x: Math.cos(angle) * ring * 6.5,
-      y: normalizedY * 6.5,
-      z: -18,
-    };
-  });
-}
-
-function checklistTargets(absoluteTime: number): Target[] {
-  const foreground = Array.from({ length: FOREGROUND_COUNT }, (_, index) => {
-    const row = Math.floor(index / 11);
-    const localIndex = index % 11;
-    const rowY = row === 0 ? -10 : 10;
-    if (localIndex < 4) {
-      const path = [
-        { x: -22, y: rowY },
-        { x: -18.5, y: rowY + 3 },
-        { x: -13.8, y: rowY - 4 },
-      ];
-      const segment = localIndex < 2 ? 0 : 1;
-      const progress = localIndex % 2;
-      return {
-        alpha: 1,
-        radiusX: 1.55,
-        radiusY: 1.55,
-        x: mix(path[segment].x, path[segment + 1].x, progress),
-        y: mix(path[segment].y, path[segment + 1].y, progress),
-        z: 10,
-      };
-    }
-    const progress = (localIndex - 4) / 6;
-    const radius = 0.9 + Math.abs(progress - 0.5) * 0.7;
-    return {
-      alpha: 1,
-      radiusX: radius,
-      radiusY: radius,
-      x: -5 + progress * 29,
-      y: rowY + Math.sin(absoluteTime * 0.45 + row) * 0.18,
-      z: 10,
-    };
-  });
-  return [...foreground, ...coreTargets(absoluteTime)];
-}
-
-function waveTargets(absoluteTime: number): Target[] {
-  const foreground = Array.from({ length: FOREGROUND_COUNT }, (_, index) => {
-    const lane = Math.floor(index / 11);
-    const localIndex = index % 11;
-    const progress = localIndex / 10;
-    const wave = Math.sin(progress * TAU * 1.25 + absoluteTime * 0.9 + lane * 0.85);
-    const edge = Math.abs(progress - 0.5) * 2;
-    const radius = 0.82 + Math.pow(edge, 1.35) * 1.45;
-    return {
-      alpha: 1,
-      radiusX: radius,
-      radiusY: radius,
-      x: -26 + progress * 52,
-      y: (lane === 0 ? -6 : 6) + wave * 5.2,
-      z: 10 + wave,
-    };
-  });
-  return [...foreground, ...coreTargets(absoluteTime)];
-}
-
-const PYRAMID_EDGES: Array<[number, number, number, number, number, number]> = [
-  [0, -1.25, 0, -1, 0.75, -1],
-  [0, -1.25, 0, 1, 0.75, -1],
-  [0, -1.25, 0, 1, 0.75, 1],
-  [0, -1.25, 0, -1, 0.75, 1],
-  [-1, 0.75, -1, 1, 0.75, -1],
-  [1, 0.75, -1, 1, 0.75, 1],
-  [1, 0.75, 1, -1, 0.75, 1],
-  [-1, 0.75, 1, -1, 0.75, -1],
+const CUBE_EDGES: Array<[number, number, number, number, number, number]> = [
+  [-1, -1, -1, 1, -1, -1],
+  [1, -1, -1, 1, 1, -1],
+  [1, 1, -1, -1, 1, -1],
+  [-1, 1, -1, -1, -1, -1],
+  [-1, -1, 1, 1, -1, 1],
+  [1, -1, 1, 1, 1, 1],
+  [1, 1, 1, -1, 1, 1],
+  [-1, 1, 1, -1, -1, 1],
+  [-1, -1, -1, -1, -1, 1],
+  [1, -1, -1, 1, -1, 1],
+  [1, 1, -1, 1, 1, 1],
+  [-1, 1, -1, -1, 1, 1],
 ];
 
-function pyramidTargets(absoluteTime: number): Target[] {
-  const rotation = absoluteTime * 0.34;
-  const cosine = Math.cos(rotation);
-  const sine = Math.sin(rotation);
-  const foreground = Array.from({ length: FOREGROUND_COUNT }, (_, index) => {
-    const edgeIndex = index % PYRAMID_EDGES.length;
-    const sampleIndex = Math.floor(index / PYRAMID_EDGES.length);
-    const samplesOnEdge = Math.ceil(FOREGROUND_COUNT / PYRAMID_EDGES.length);
-    const progress = sampleIndex / Math.max(1, samplesOnEdge - 1);
-    const edge = PYRAMID_EDGES[edgeIndex];
-    const x3d = mix(edge[0], edge[3], progress) * 18;
-    const y3d = mix(edge[1], edge[4], progress) * 18;
-    const z3d = mix(edge[2], edge[5], progress) * 18;
-    const rotatedX = x3d * cosine + z3d * sine;
-    const rotatedZ = -x3d * sine + z3d * cosine;
-    const perspective = 1 + rotatedZ / 190;
-    const nodeRadius = 0.95 + clamp(Math.hypot(rotatedX, y3d) / 30, 0, 1) * 1.3;
+function cubeTargets(absoluteTime: number): Target[] {
+  const rotationY = absoluteTime * 0.58;
+  const rotationX = 0.48 + Math.sin(absoluteTime * 0.32) * 0.12;
+  const cosineY = Math.cos(rotationY);
+  const sineY = Math.sin(rotationY);
+  const cosineX = Math.cos(rotationX);
+  const sineX = Math.sin(rotationX);
+
+  return Array.from({ length: NODE_COUNT }, (_, index) => {
+    const edgeIndex = index % CUBE_EDGES.length;
+    const sampleIndex = Math.floor(index / CUBE_EDGES.length);
+    const sampleCount = edgeIndex < 4 ? 3 : 2;
+    const progress = sampleCount === 3 ? [0.12, 0.5, 0.88][sampleIndex] : [0.18, 0.82][sampleIndex];
+    const edge = CUBE_EDGES[edgeIndex];
+    const x3d = mix(edge[0], edge[3], progress) * 24;
+    const y3d = mix(edge[1], edge[4], progress) * 24;
+    const z3d = mix(edge[2], edge[5], progress) * 24;
+    const rotatedX = x3d * cosineY + z3d * sineY;
+    const rotatedZ = -x3d * sineY + z3d * cosineY;
+    const rotatedY = y3d * cosineX - rotatedZ * sineX;
+    const tiltedZ = y3d * sineX + rotatedZ * cosineX;
+    const depth = clamp((tiltedZ / 42 + 1) * 0.5, 0, 1);
+    const perspective = 1 + tiltedZ / 230;
+    const projectedX = rotatedX * perspective;
+    const projectedY = rotatedY * perspective;
+    const nodeRadius = 1.1 + clamp(Math.hypot(projectedX, projectedY) / 40, 0, 1) * 1.6;
     return {
-      alpha: 1,
+      alpha: 0.38 + depth * 0.62,
       radiusX: nodeRadius,
       radiusY: nodeRadius,
-      x: rotatedX * perspective,
-      y: y3d * perspective + 3,
-      z: rotatedZ + 10,
+      x: projectedX,
+      y: projectedY,
+      z: tiltedZ,
     };
   });
-  return [...foreground, ...coreTargets(absoluteTime)];
 }
 
 function targetsFor(
   scene: AgentScene,
   absoluteTime: number,
   localTime: number,
+  gazeX: number,
   gazeY: number,
 ): Target[] {
   switch (scene) {
     case 'agent':
-      return referenceAgentTargets(localTime, gazeY);
+      return referenceAgentTargets(localTime, gazeX, gazeY);
     case 'globe':
       return globeTargets(absoluteTime, 1);
-    case 'checklist':
-      return checklistTargets(absoluteTime);
-    case 'wave':
-      return waveTargets(absoluteTime);
-    case 'pyramid':
-      return pyramidTargets(absoluteTime);
+    case 'cube':
+      return cubeTargets(absoluteTime);
+    case 'fast':
+      return referenceAgentTargets(localTime, gazeX, gazeY, 4, true, true);
   }
 }
 
@@ -395,12 +341,12 @@ export class UnifiedAgentEngine {
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
   private frame = 0;
-  private gaze = { targetY: 0, y: 0 };
+  private gaze = { targetX: 0, targetY: 0, x: 0, y: 0 };
   private lastShape: AgentScene = 'globe';
   private lastTime = 0;
   private nodes: Node[];
   private prefersReducedMotion: MediaQueryList;
-  private repel = { active: false, strength: 0, x: CENTER, y: CENTER };
+  private repel = { strength: 0, targetStrength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
   private scene: AgentScene = 'agent';
   private sceneStarted = performance.now() - EYE_ARRIVAL_DURATION;
@@ -416,7 +362,7 @@ export class UnifiedAgentEngine {
     this.context = context;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const firstTargets = referenceAgentTargets(EYE_ARRIVAL_DURATION * 0.001, 0);
+    const firstTargets = referenceAgentTargets(EYE_ARRIVAL_DURATION * 0.001, 0, 0);
     this.nodes = firstTargets.map((target, index) => ({
       ...target,
       activation: 0,
@@ -433,10 +379,9 @@ export class UnifiedAgentEngine {
     }));
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
-    canvas.addEventListener('pointermove', this.updateRepel, { passive: true });
-    canvas.addEventListener('pointerleave', this.releaseRepel);
-    canvas.addEventListener('pointercancel', this.releaseRepel);
-    window.addEventListener('pointermove', this.updateGaze, { passive: true });
+    window.addEventListener('pointermove', this.updatePointer, { passive: true });
+    window.addEventListener('pointercancel', this.releaseRepel);
+    window.addEventListener('blur', this.releaseRepel);
     this.resize();
     this.frame = requestAnimationFrame(this.tick);
   }
@@ -444,10 +389,9 @@ export class UnifiedAgentEngine {
   destroy() {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
-    this.canvas.removeEventListener('pointermove', this.updateRepel);
-    this.canvas.removeEventListener('pointerleave', this.releaseRepel);
-    this.canvas.removeEventListener('pointercancel', this.releaseRepel);
-    window.removeEventListener('pointermove', this.updateGaze);
+    window.removeEventListener('pointermove', this.updatePointer);
+    window.removeEventListener('pointercancel', this.releaseRepel);
+    window.removeEventListener('blur', this.releaseRepel);
   }
 
   setDetail(detail: UnifiedAgentDetail) {
@@ -473,21 +417,30 @@ export class UnifiedAgentEngine {
     this.context.imageSmoothingEnabled = true;
   };
 
-  private updateGaze = (event: PointerEvent) => {
-    this.gaze.targetY = clamp((event.clientY / window.innerHeight - 0.5) * 2, -1, 1);
-  };
-
-  private updateRepel = (event: PointerEvent) => {
-    if (event.pointerType === 'touch') return;
+  private updatePointer = (event: PointerEvent) => {
     const bounds = this.canvas.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return;
+    const centerX = bounds.left + bounds.width * 0.5;
+    const centerY = bounds.top + bounds.height * 0.5;
+    const gazeRange = Math.max(90, bounds.width * 1.25);
+    this.gaze.targetX = clamp((event.clientX - centerX) / gazeRange, -1, 1);
+    this.gaze.targetY = clamp((event.clientY - centerY) / gazeRange, -1, 1);
+
+    if (event.pointerType === 'touch') {
+      this.repel.targetStrength = 0;
+      return;
+    }
+    const outsideX = Math.max(bounds.left - event.clientX, 0, event.clientX - bounds.right);
+    const outsideY = Math.max(bounds.top - event.clientY, 0, event.clientY - bounds.bottom);
+    const distance = Math.hypot(outsideX, outsideY);
+    const approachRadius = Math.max(72, bounds.width * 0.48);
     this.repel.x = clamp(((event.clientX - bounds.left) / bounds.width) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
     this.repel.y = clamp(((event.clientY - bounds.top) / bounds.height) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
-    this.repel.active = true;
+    this.repel.targetStrength = clamp(1 - distance / approachRadius, 0, 1);
   };
 
   private releaseRepel = () => {
-    this.repel.active = false;
+    this.repel.targetStrength = 0;
   };
 
   private beginScene(time: number) {
@@ -499,7 +452,7 @@ export class UnifiedAgentEngine {
       this.scene = 'agent';
     }
     this.sceneStarted = time;
-    const targets = targetsFor(this.scene, time * 0.001, 0, this.gaze.y);
+    const targets = targetsFor(this.scene, time * 0.001, 0, this.gaze.x, this.gaze.y);
     assignNearest(this.nodes, targets);
     for (const node of this.nodes) {
       node.activation = time + Math.pow(node.seed, 1.7) * 130;
@@ -530,13 +483,15 @@ export class UnifiedAgentEngine {
   private update(time: number, delta: number) {
     const elapsed = time - this.sceneStarted;
     const localTime = elapsed * 0.001;
+    this.gaze.x += (this.gaze.targetX - this.gaze.x) * (1 - Math.exp(-5.2 * delta));
     this.gaze.y += (this.gaze.targetY - this.gaze.y) * (1 - Math.exp(-4.2 * delta));
     this.repel.strength +=
-      ((this.repel.active ? 1 : 0) - this.repel.strength) * (1 - Math.exp(-13 * delta));
+      (this.repel.targetStrength - this.repel.strength) * (1 - Math.exp(-10 * delta));
     const targets = targetsFor(
       this.scene,
       time * 0.001,
       localTime,
+      this.gaze.x,
       this.gaze.y,
     );
 
@@ -549,7 +504,8 @@ export class UnifiedAgentEngine {
       node.velocityY += (destination.y - node.y) * stiffness * delta;
       node.velocityZ += (destination.z - node.z) * stiffness * delta;
 
-      if (this.repel.strength > 0.001) {
+      const isEye = (this.scene === 'agent' || this.scene === 'fast') && node.slot < 2;
+      if (!isEye && this.repel.strength > 0.001) {
         let repelX = CENTER + node.x - this.repel.x;
         let repelY = CENTER + node.y - this.repel.y;
         let distance = Math.hypot(repelX, repelY);

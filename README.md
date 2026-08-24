@@ -1,7 +1,7 @@
 # Magnetic Morph Studies
 
 A centered Canvas 2D agent built from one fixed set of particles. The primary
-page is a single white field with a spherical black agent; the original twelve
+page opens in dark mode with a spherical lime agent; the original twelve
 40 × 40 studies now live at `/studies` with their grid and carousel controls.
 
 ## Unified spherical agent
@@ -12,12 +12,14 @@ front and rear hemispheres, then rotate quickly with a gentle secondary tilt
 and independent wobble. The eyes remain fixed in the center. As they arrive,
 two soft elliptical exclusion areas grow with them and redirect only the nearby
 circles, creating the protected face without flattening the rest of the globe.
-The complete composition still repels locally on hover.
+The complete composition begins repelling as the cursor approaches its bounds,
+while the anchored eyes follow the same cursor vector without being displaced.
 
 The eyes blink by collapsing vertically and become circular nodes before the
 agent reorganizes. Each cycle alternates the face with one randomly selected
-globe, checklist, waveform, or rotating pyramid, then always returns to the
-face before choosing another shape.
+clean globe, rotating cube, or fast thinking state, then always returns to the
+face before choosing another state. Fast mode keeps the eyed sphere but rotates
+the field at four times normal speed and narrows the eyes.
 
 All light-mode geometry uses pure black. Depth and hierarchy come from particle
 size: dots are smallest near the projected center and become larger toward the
@@ -33,7 +35,7 @@ sound, and view controls remain above it.
 ## Compact studies
 
 The secondary `/studies` page continuously reorganizes fixed 72-particle sets
-into data forms, geometric solids, and amorphic forms. It opens in light mode
+into data forms, geometric solids, and amorphic forms. It opens in dark mode
 and grid view, retains the earlier dark `#0A0506` and accent `#D9FF2F` theme,
 and includes the autoplaying spatial carousel. In light mode every dot is now
 pure black; neutral depth values reduce particle size rather than tinting gray.

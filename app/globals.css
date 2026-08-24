@@ -2,7 +2,7 @@
 
 :root {
   color: #242424;
-  background: #ffffff;
+  background: #0a0506;
   font-synthesis: none;
   text-rendering: geometricPrecision;
 }
@@ -17,7 +17,7 @@ body {
   min-width: 320px;
   min-height: 100%;
   margin: 0;
-  background: #ffffff;
+  background: #0a0506;
 }
 
 body {

@@ -358,7 +358,7 @@ function MorphStudy({
 
 export function MorphGallery() {
   const shouldReduceMotion = useReducedMotion();
-  const [theme, setTheme] = useState<MagneticTheme>('light');
+  const [theme, setTheme] = useState<MagneticTheme>('dark');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('grid');
   const [selectedIndex, setSelectedIndex] = useState(8);
   const [soundEnabled, setSoundEnabled] = useState(true);
