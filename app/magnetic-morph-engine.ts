@@ -56,9 +56,18 @@ type EngineOptions = {
   variant: number;
 };
 
+type RepelField = {
+  active: boolean;
+  strength: number;
+  x: number;
+  y: number;
+};
+
 const PARTICLE_COUNT = 72;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const REPEL_RADIUS = 10.8;
+const REPEL_FORCE = 520;
 const BACKGROUNDS: Record<MagneticTheme, Record<MagneticSurface, string>> = {
   light: {
     page: '#FFFFFF',
@@ -597,6 +606,12 @@ export class MagneticMorphEngine {
   private particles: Particle[];
   private prefersReducedMotion: MediaQueryList;
   private resizeObserver: ResizeObserver;
+  private repel: RepelField = {
+    active: false,
+    strength: 0,
+    x: 20,
+    y: 20,
+  };
   private shapeIndex = 0;
   private shapeStarted = 0;
   private surface: MagneticSurface;
@@ -637,6 +652,9 @@ export class MagneticMorphEngine {
 
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
+    canvas.addEventListener('pointermove', this.updateRepel, { passive: true });
+    canvas.addEventListener('pointerleave', this.releaseRepel);
+    canvas.addEventListener('pointercancel', this.releaseRepel);
     acquirePointerGaze();
     this.resize();
     this.shapeStarted = performance.now() - (options.offset % 1) * options.tempo;
@@ -646,6 +664,9 @@ export class MagneticMorphEngine {
   destroy() {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
+    this.canvas.removeEventListener('pointermove', this.updateRepel);
+    this.canvas.removeEventListener('pointerleave', this.releaseRepel);
+    this.canvas.removeEventListener('pointercancel', this.releaseRepel);
     releasePointerGaze();
   }
 
@@ -674,6 +695,21 @@ export class MagneticMorphEngine {
     this.canvas.height = width;
     this.context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     this.context.imageSmoothingEnabled = true;
+  };
+
+  private updateRepel = (event: PointerEvent) => {
+    if (event.pointerType === 'touch') return;
+
+    const bounds = this.canvas.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+
+    this.repel.x = clamp(((event.clientX - bounds.left) / bounds.width) * 40, 0, 40);
+    this.repel.y = clamp(((event.clientY - bounds.top) / bounds.height) * 40, 0, 40);
+    this.repel.active = true;
+  };
+
+  private releaseRepel = () => {
+    this.repel.active = false;
   };
 
   private beginShape(time: number) {
@@ -724,6 +760,9 @@ export class MagneticMorphEngine {
   private update(time: number, delta: number) {
     const shape = this.options.sequence[this.shapeIndex];
     const targets = targetsFor(shape, time * 0.001, this.options.variant);
+    const repelTarget = this.repel.active ? 1 : 0;
+    this.repel.strength +=
+      (repelTarget - this.repel.strength) * (1 - Math.exp(-16 * delta));
 
     for (const particle of this.particles) {
       const target = targets[particle.slot];
@@ -737,6 +776,28 @@ export class MagneticMorphEngine {
 
       particle.velocityX += (targetX - particle.x) * stiffness * delta;
       particle.velocityY += (targetY - particle.y) * stiffness * delta;
+
+      if (this.repel.strength > 0.001) {
+        let repelX = particle.x - this.repel.x;
+        let repelY = particle.y - this.repel.y;
+        let distance = Math.hypot(repelX, repelY);
+
+        if (distance < 0.001) {
+          const angle = particle.seed * TAU;
+          repelX = Math.cos(angle);
+          repelY = Math.sin(angle);
+          distance = 1;
+        }
+
+        if (distance < REPEL_RADIUS) {
+          const proximity = 1 - distance / REPEL_RADIUS;
+          const falloff = proximity * proximity * (3 - 2 * proximity);
+          const force = (REPEL_FORCE * falloff * this.repel.strength) / particle.mass;
+          particle.velocityX += (repelX / distance) * force * delta;
+          particle.velocityY += (repelY / distance) * force * delta;
+        }
+      }
+
       particle.velocityX *= damping;
       particle.velocityY *= damping;
       particle.x += particle.velocityX * delta;

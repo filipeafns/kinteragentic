@@ -48,6 +48,7 @@ combines:
 - a persistent home position for each particle;
 - staggered assembly along curved paths;
 - per-particle lag and mass variation;
+- a compact per-icon pointer field that repels nearby particles on hover;
 - pointer and impact offsets layered over the home position;
 - a damped spring that returns displaced particles to their structure; and
 - velocity-sensitive movement that gives the field metallic inertia.
