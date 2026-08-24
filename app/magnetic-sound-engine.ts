@@ -1,6 +1,6 @@
 import { play, setEnabled, setVolume, type SoundName } from 'cuelume';
 
-export type AgentSoundState = 'agent' | 'globe' | 'cube' | 'fast';
+export type AgentSoundState = 'agent' | 'fast' | 'cube' | 'collapse' | 'bars' | 'globe';
 
 type SoundLayer = {
   cue: SoundName;
@@ -35,6 +35,14 @@ const SOUND_SIGNATURES: Record<AgentSoundState, SoundSignature> = {
   fast: {
     hover: [layer('tick', 0, 0.15), layer('scan', 28, 0.1)],
     focus: [layer('scan', 0, 0.17), layer('tick', 36, 0.16), layer('pulse', 104, 0.12)],
+  },
+  collapse: {
+    hover: [layer('tick', 0, 0.14), layer('release', 28, 0.1)],
+    focus: [layer('release', 0, 0.17), layer('pulse', 38, 0.15), layer('bloom', 112, 0.11)],
+  },
+  bars: {
+    hover: [layer('tick', 0, 0.14), layer('scan', 30, 0.1)],
+    focus: [layer('scan', 0, 0.16), layer('tick', 42, 0.17), layer('loading', 118, 0.11)],
   },
 };
 

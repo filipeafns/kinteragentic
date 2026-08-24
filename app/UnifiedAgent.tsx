@@ -25,8 +25,23 @@ type CarouselStyle = CSSProperties & {
   '--carousel-y': string;
 };
 
-const VARIANTS: UnifiedAgentVariant[] = ['auto', 'agent', 'globe', 'cube', 'fast'];
-const CAROUSEL_STATES: AgentSoundState[] = ['agent', 'globe', 'cube', 'fast'];
+const VARIANTS: UnifiedAgentVariant[] = [
+  'auto',
+  'agent',
+  'fast',
+  'cube',
+  'collapse',
+  'bars',
+  'globe',
+];
+const CAROUSEL_STATES: AgentSoundState[] = [
+  'agent',
+  'fast',
+  'cube',
+  'collapse',
+  'bars',
+  'globe',
+];
 const AUTOPLAY_MS = 4_200;
 
 function useReducedMotion() {
@@ -59,23 +74,31 @@ function carouselStyle(
   const stageSize = detail * 80;
   const selectedScale = detail === 1 ? 1.56 : detail === 2 ? 1.24 : 1;
   const neighborScale = detail === 1 ? 1 : detail === 2 ? 0.8 : 0.54;
-  const oppositeScale = detail === 1 ? 0.7 : detail === 2 ? 0.56 : 0.38;
-  const opposite = distance === 2;
+  const outerScale = detail === 1 ? 0.7 : detail === 2 ? 0.56 : 0.4;
+  const oppositeScale = detail === 1 ? 0.48 : detail === 2 ? 0.4 : 0.28;
+  const opposite = distance === 3;
+  const horizontalDistance =
+    distance === 1
+      ? 154 + (stageSize - 80) * 0.72
+      : 252 + (stageSize - 80) * 0.85;
+  const verticalDistance =
+    distance === 1
+      ? 116 + (stageSize - 80) * 0.28
+      : distance === 2
+        ? 238 + (stageSize - 80) * 0.35
+        : 304 + (stageSize - 80) * 0.12;
 
   return {
-    '--carousel-blur': `${distance < 2 ? 0 : 4.5}px`,
-    '--carousel-opacity': `${[1, 0.72, 0.2][distance]}`,
-    '--carousel-scale': `${[selectedScale, neighborScale, oppositeScale][distance]}`,
-    '--carousel-x': `${
-      opposite ? 0 : Math.sign(delta) * (154 + (stageSize - 80) * 0.72)
-    }px`,
-    '--carousel-y': `${
-      distance === 0
-        ? 0
-        : opposite
-          ? 258 + (stageSize - 80) * 0.38
-          : 116 + (stageSize - 80) * 0.28
-    }px`,
+    '--carousel-blur': `${distance <= 1 ? 0 : (distance - 1) * 3.2}px`,
+    '--carousel-opacity': `${[1, 0.72, 0.3, 0.1][distance]}`,
+    '--carousel-scale': `${[
+      selectedScale,
+      neighborScale,
+      outerScale,
+      oppositeScale,
+    ][distance]}`,
+    '--carousel-x': `${opposite ? 0 : Math.sign(delta) * horizontalDistance}px`,
+    '--carousel-y': `${distance === 0 ? 0 : verticalDistance}px`,
     zIndex: 100 - distance,
   };
 }
@@ -110,7 +133,8 @@ function GridGlyph() {
 }
 
 function VariantGlyph({ variant }: { variant: UnifiedAgentVariant }) {
-  const count = variant === 'agent' ? 2 : variant === 'fast' ? 3 : 1;
+  const count =
+    variant === 'agent' ? 2 : variant === 'fast' || variant === 'collapse' ? 3 : variant === 'bars' ? 4 : 1;
   return (
     <span className={`variant-glyph variant-glyph--${variant}`} aria-hidden="true">
       {Array.from({ length: count }, (_, index) => (

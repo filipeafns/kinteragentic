@@ -1,7 +1,7 @@
 export type UnifiedAgentTheme = 'light' | 'dark';
 export type UnifiedAgentDetail = 1 | 2 | 4;
 
-type AgentScene = 'agent' | 'globe' | 'cube' | 'fast';
+type AgentScene = 'agent' | 'fast' | 'cube' | 'collapse' | 'bars' | 'globe';
 export type UnifiedAgentVariant = 'auto' | AgentScene;
 
 type Target = {
@@ -29,7 +29,7 @@ type Node = Target & {
   velocityZ: number;
 };
 
-const LOGICAL_SIZE = 100;
+const LOGICAL_SIZE = 180;
 const CENTER = LOGICAL_SIZE / 2;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -39,10 +39,11 @@ const SHAPE_DURATION = 3_900;
 const FACE_SPHERE_RADIUS = 42;
 const EYE_ARRIVAL_DURATION = 1_100;
 const FAST_SPEED = 7;
+const COLLAPSE_CYCLE = 2.35;
 const BURST_DURATION = 1_000;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
-const RANDOM_SHAPES: AgentScene[] = ['globe', 'cube', 'fast'];
+const RANDOM_SHAPES: AgentScene[] = ['fast', 'cube', 'collapse', 'bars', 'globe'];
 
 const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
   light: { background: '#FFFFFF', particle: '#000000' },
@@ -315,6 +316,61 @@ function cubeTargets(absoluteTime: number): Target[] {
   });
 }
 
+function collapseTargets(absoluteTime: number, localTime: number): Target[] {
+  const phase = localTime % COLLAPSE_CYCLE;
+  let collapse = 0;
+  if (phase < 0.34) {
+    collapse = ease(phase / 0.34);
+  } else if (phase < 0.58) {
+    collapse = 1;
+  } else if (phase < 1.08) {
+    collapse = 1 - ease((phase - 0.58) / 0.5);
+  }
+
+  const scale = mix(1, 0.025, collapse);
+  const spin = absoluteTime * mix(0.7, 7.8, collapse);
+  return Array.from({ length: NODE_COUNT }, (_, index) => {
+    const target = globePoint(index, spin, 34);
+    const coreAngle = index * GOLDEN_ANGLE + absoluteTime * 9.4;
+    const coreRadius = (0.18 + hash(index * 7.9) * 0.92) * collapse;
+    const x = target.x * scale + Math.cos(coreAngle) * coreRadius;
+    const y = target.y * scale + Math.sin(coreAngle) * coreRadius;
+    const nodeRadius = mix(target.radiusX, 1.05 + hash(index * 3.2) * 0.42, collapse);
+    return {
+      alpha: mix(target.alpha, 0.82 + hash(index * 4.1) * 0.18, collapse),
+      radiusX: nodeRadius,
+      radiusY: nodeRadius,
+      x,
+      y,
+      z: target.z * scale,
+    };
+  });
+}
+
+function barTargets(absoluteTime: number): Target[] {
+  const columnCount = 7;
+  const nodesPerColumn = NODE_COUNT / columnCount;
+  return Array.from({ length: NODE_COUNT }, (_, index) => {
+    const column = Math.floor(index / nodesPerColumn);
+    const row = index % nodesPerColumn;
+    const columnPhase = absoluteTime * 4.4 + column * 0.88;
+    const trackingY =
+      Math.sin(columnPhase) * 10.5 + Math.sin(columnPhase * 0.53 + column * 1.7) * 3.4;
+    const pulse = (Math.sin(columnPhase * 1.17 + row * 0.62) + 1) * 0.5;
+    const x = (column - (columnCount - 1) * 0.5) * 8.2;
+    const y = (row - (nodesPerColumn - 1) * 0.5) * 7.2 + trackingY;
+    const nodeRadius = 1.45 + pulse * 0.72;
+    return {
+      alpha: 0.72 + pulse * 0.28,
+      radiusX: nodeRadius,
+      radiusY: nodeRadius,
+      x,
+      y,
+      z: Math.sin(columnPhase + row * 0.8) * 8,
+    };
+  });
+}
+
 function targetsFor(
   scene: AgentScene,
   absoluteTime: number,
@@ -331,6 +387,10 @@ function targetsFor(
       return cubeTargets(absoluteTime);
     case 'fast':
       return referenceAgentTargets(localTime, gazeX, gazeY, FAST_SPEED, true, true);
+    case 'collapse':
+      return collapseTargets(absoluteTime, localTime);
+    case 'bars':
+      return barTargets(absoluteTime);
   }
 }
 
@@ -358,6 +418,7 @@ function assignNearest(nodes: Node[], targets: Target[]) {
 
 export class UnifiedAgentEngine {
   private burstStarted = Number.NEGATIVE_INFINITY;
+  private burstTimer = 0;
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
   private frame = 0;
@@ -413,6 +474,8 @@ export class UnifiedAgentEngine {
 
   destroy() {
     cancelAnimationFrame(this.frame);
+    window.clearTimeout(this.burstTimer);
+    this.canvas.removeAttribute('data-bursting');
     this.resizeObserver.disconnect();
     this.canvas.removeEventListener('pointerdown', this.triggerBurst);
     window.removeEventListener('pointermove', this.updatePointer);
@@ -491,6 +554,11 @@ export class UnifiedAgentEngine {
     const originY = clamp(((event.clientY - bounds.top) / bounds.height) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
     this.burstStarted = performance.now();
     this.repel.targetStrength = 0;
+    this.canvas.dataset.bursting = 'true';
+    window.clearTimeout(this.burstTimer);
+    this.burstTimer = window.setTimeout(() => {
+      this.canvas.removeAttribute('data-bursting');
+    }, BURST_DURATION + 80);
 
     for (const node of this.nodes) {
       let directionX = CENTER + node.x - originX;
@@ -575,8 +643,11 @@ export class UnifiedAgentEngine {
       const burstElapsed = time - this.burstStarted;
       const burstActive = burstElapsed >= 0 && burstElapsed < BURST_DURATION;
       const burstReturn = burstActive ? ease(burstElapsed / BURST_DURATION) : 1;
-      const stiffness = ((76 + node.seed * 14) / node.mass) * mix(0.045, 1, burstReturn);
-      const dampingRate = burstActive ? mix(5.4, 13.4, burstReturn) : 13.4;
+      const sceneStiffness = this.scene === 'collapse' ? 188 : this.scene === 'bars' ? 112 : 76;
+      const restingDamping = this.scene === 'collapse' ? 19 : this.scene === 'bars' ? 16 : 13.4;
+      const stiffness =
+        ((sceneStiffness + node.seed * 14) / node.mass) * mix(0.045, 1, burstReturn);
+      const dampingRate = burstActive ? mix(5.4, restingDamping, burstReturn) : restingDamping;
       const damping = Math.exp((-dampingRate / node.mass) * delta);
       node.velocityX += (destination.x - node.x) * stiffness * delta;
       node.velocityY += (destination.y - node.y) * stiffness * delta;
@@ -628,7 +699,7 @@ export class UnifiedAgentEngine {
   private draw() {
     const context = this.context;
     const colors = COLORS[this.theme];
-    context.globalAlpha = this.scene === 'fast' ? 0.19 : 1;
+    context.globalAlpha = this.scene === 'fast' ? 0.19 : this.scene === 'collapse' ? 0.34 : 1;
     context.shadowBlur = 0;
     context.fillStyle = colors.background;
     context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
