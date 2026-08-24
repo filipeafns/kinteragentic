@@ -12,6 +12,8 @@ export type MagneticShape =
   | 'helix'
   | 'wave';
 
+export type MagneticTheme = 'light' | 'dark';
+
 type Vec3 = {
   size: number;
   tone: number;
@@ -43,14 +45,21 @@ type EngineOptions = {
   offset: number;
   sequence: MagneticShape[];
   tempo: number;
+  theme: MagneticTheme;
   variant: number;
 };
 
 const PARTICLE_COUNT = 72;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const BACKGROUND = '#ffffff';
-const PALETTE = ['#323232', '#505050', '#747474', '#989898', '#b8b8b8'];
+const BACKGROUNDS: Record<MagneticTheme, string> = {
+  light: '#ffffff',
+  dark: '#0A0506',
+};
+const PALETTES: Record<MagneticTheme, string[]> = {
+  light: ['#323232', '#505050', '#747474', '#989898', '#b8b8b8'],
+  dark: ['#D9FF2F', '#B8D929', '#91AA22', '#697B1B', '#424D13'],
+};
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
@@ -432,6 +441,7 @@ export class MagneticMorphEngine {
   private resizeObserver: ResizeObserver;
   private shapeIndex = 0;
   private shapeStarted = 0;
+  private theme: MagneticTheme;
 
   constructor(canvas: HTMLCanvasElement, options: EngineOptions) {
     const context = canvas.getContext('2d', { alpha: false });
@@ -440,6 +450,7 @@ export class MagneticMorphEngine {
     this.canvas = canvas;
     this.context = context;
     this.options = options;
+    this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.shapeIndex = Math.floor(options.offset) % options.sequence.length;
     const firstShape = options.sequence[this.shapeIndex];
@@ -473,6 +484,11 @@ export class MagneticMorphEngine {
   destroy() {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
+  }
+
+  setTheme(theme: MagneticTheme) {
+    this.theme = theme;
+    this.draw();
   }
 
   private resize = () => {
@@ -557,14 +573,15 @@ export class MagneticMorphEngine {
 
   private draw() {
     const context = this.context;
-    context.fillStyle = BACKGROUND;
+    const palette = PALETTES[this.theme];
+    context.fillStyle = BACKGROUNDS[this.theme];
     context.fillRect(0, 0, 40, 40);
 
     const ordered = [...this.particles].sort((a, b) => a.size - b.size);
     for (const particle of ordered) {
-      const paletteIndex = Math.round(clamp(particle.tone, 0, 1) * (PALETTE.length - 1));
+      const paletteIndex = Math.round(clamp(particle.tone, 0, 1) * (palette.length - 1));
       const radius = clamp(particle.size, 0.38, 1.14);
-      context.fillStyle = PALETTE[paletteIndex];
+      context.fillStyle = palette[paletteIndex];
       context.beginPath();
       context.arc(particle.x, particle.y, radius, 0, TAU);
       context.fill();

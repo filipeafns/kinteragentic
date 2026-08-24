@@ -2,6 +2,9 @@
 
 Twelve 40 × 40 pixel Canvas 2D studies that continuously reorganize one fixed
 set of opaque particles into data forms, geometric solids, and amorphic forms.
+The default dark experience uses `#0A0506` with the solid accent `#D9FF2F` and
+adapts the Shipium spatial-wheel mechanic into an autoplaying carousel. A glass
+control switches between dark/light themes and carousel/grid views.
 
 ## Reference behavior extracted from Magnets
 

@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://magnetic-morph-studies.filipeafns.chatgpt.site'),
   title: 'Magnetic Morph Studies',
   description:
-    'Twelve contained particle studies morphing between data forms, geometric solids, and amorphic clouds.',
+    'Twelve magnetic particle studies in a dark spatial carousel and responsive grid.',
   openGraph: {
     title: 'Magnetic Morph Studies',
     description: 'Opaque particle reorganization in twelve contained 40-pixel studies.',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Six gray particle forms arranged on white above the title Magnetic Morph Studies',
+        alt: 'Lime particle forms arranged in a curved dark carousel beneath the title Magnetic Morph Studies',
       },
     ],
   },
