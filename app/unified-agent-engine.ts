@@ -1,7 +1,7 @@
 export type UnifiedAgentTheme = 'light' | 'dark';
 export type UnifiedAgentDetail = 1 | 2 | 4;
 
-type AgentScene = 'agent' | 'fast' | 'cube' | 'collapse' | 'bars' | 'globe';
+type AgentScene = 'agent' | 'fast' | 'trail' | 'cube' | 'collapse' | 'bars' | 'globe';
 export type UnifiedAgentVariant = 'auto' | AgentScene;
 
 type Target = {
@@ -43,7 +43,12 @@ const COLLAPSE_CYCLE = 2.35;
 const BURST_DURATION = 1_000;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
-const RANDOM_SHAPES: AgentScene[] = ['fast', 'cube', 'collapse', 'bars', 'globe'];
+const TRAIL_HEAD_COUNT = 7;
+const TRAIL_SAMPLES = NODE_COUNT / TRAIL_HEAD_COUNT;
+const TRAIL_GLOBE_HOLD = 0.68;
+const TRAIL_REVEAL_DURATION = 0.58;
+const TRAIL_SAMPLE_DELAY = 0.115;
+const RANDOM_SHAPES: AgentScene[] = ['fast', 'trail', 'cube', 'collapse', 'bars', 'globe'];
 
 const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
   light: { background: '#FFFFFF', particle: '#000000' },
@@ -89,6 +94,18 @@ const ease = (value: number) => {
   const normalized = clamp(value, 0, 1);
   return normalized * normalized * (3 - 2 * normalized);
 };
+
+function mixTarget(from: Target, to: Target, amount: number): Target {
+  return {
+    alpha: mix(from.alpha, to.alpha, amount),
+    angle: mix(from.angle ?? 0, to.angle ?? 0, amount),
+    radiusX: mix(from.radiusX, to.radiusX, amount),
+    radiusY: mix(from.radiusY, to.radiusY, amount),
+    x: mix(from.x, to.x, amount),
+    y: mix(from.y, to.y, amount),
+    z: mix(from.z, to.z, amount),
+  };
+}
 
 const hash = (value: number) => {
   const result = Math.sin(value * 91.3458 + 17.234) * 47453.5453;
@@ -277,6 +294,53 @@ function globeTargets(absoluteTime: number, scale: number): Target[] {
   });
 }
 
+function trailWavePoint(leader: number, history: number, absoluteTime: number): Target {
+  const sampleTime = absoluteTime - history * TRAIL_SAMPLE_DELAY;
+  const leaderPhase = (leader / TRAIL_HEAD_COUNT) * TAU;
+  const chase = Math.sin(sampleTime * 3.7 + leaderPhase * 1.45) * 0.13;
+  const longitude = sampleTime * 2.4 + leaderPhase + chase;
+  const latitude = Math.sin(longitude * 2 + sampleTime * 0.58) * 0.38;
+  const radius = 34;
+  const latitudeCosine = Math.cos(latitude);
+  const x3d = Math.cos(longitude) * latitudeCosine * radius;
+  const y3d = Math.sin(latitude) * radius * 0.94;
+  const z3d = Math.sin(longitude) * latitudeCosine * radius;
+  const tilt = 0.34 + Math.sin(sampleTime * 0.47) * 0.06;
+  const tiltCosine = Math.cos(tilt);
+  const tiltSine = Math.sin(tilt);
+  const rotatedY = y3d * tiltCosine - z3d * tiltSine;
+  const rotatedZ = y3d * tiltSine + z3d * tiltCosine;
+  const perspective = 1 + (rotatedZ / radius) * 0.08;
+  const x = x3d * perspective;
+  const y = rotatedY * perspective;
+  const edge = clamp(Math.hypot(x, y) / radius, 0, 1);
+  const depth = clamp((rotatedZ / radius + 1) * 0.5, 0, 1);
+  const historyScale = [1, 0.48, 0.26, 0.14][history] ?? 0.14;
+  const nodeRadius = (1.15 + edge * 1.85) * historyScale;
+
+  return {
+    alpha: 0.3 + depth * 0.7,
+    radiusX: nodeRadius,
+    radiusY: nodeRadius,
+    x,
+    y,
+    z: rotatedZ,
+  };
+}
+
+function trailTargets(absoluteTime: number, localTime: number): Target[] {
+  const globe = globeTargets(absoluteTime, 1);
+  if (localTime <= TRAIL_GLOBE_HOLD) return globe;
+
+  const wave = Array.from({ length: NODE_COUNT }, (_, index) => {
+    const leader = Math.floor(index / TRAIL_SAMPLES);
+    const history = index % TRAIL_SAMPLES;
+    return trailWavePoint(leader, history, absoluteTime);
+  });
+  const reveal = ease((localTime - TRAIL_GLOBE_HOLD) / TRAIL_REVEAL_DURATION);
+  return wave.map((target, index) => mixTarget(globe[index], target, reveal));
+}
+
 function cubeTargets(absoluteTime: number): Target[] {
   const rotationY = absoluteTime * 0.58;
   const rotationX = 0.48 + Math.sin(absoluteTime * 0.32) * 0.12;
@@ -387,6 +451,8 @@ function targetsFor(
       return cubeTargets(absoluteTime);
     case 'fast':
       return referenceAgentTargets(localTime, gazeX, gazeY, FAST_SPEED, true, true);
+    case 'trail':
+      return trailTargets(absoluteTime, localTime);
     case 'collapse':
       return collapseTargets(absoluteTime, localTime);
     case 'bars':
@@ -432,6 +498,7 @@ export class UnifiedAgentEngine {
   private repel = { strength: 0, targetStrength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
   private scene: AgentScene = 'agent';
+  private sceneLocalTime = 0;
   private sceneStarted = performance.now() - EYE_ARRIVAL_DURATION;
   private theme: UnifiedAgentTheme;
 
@@ -625,6 +692,7 @@ export class UnifiedAgentEngine {
   private update(time: number, delta: number) {
     const elapsed = time - this.sceneStarted;
     const localTime = elapsed * 0.001;
+    this.sceneLocalTime = localTime;
     this.gaze.x += (this.gaze.targetX - this.gaze.x) * (1 - Math.exp(-5.2 * delta));
     this.gaze.y += (this.gaze.targetY - this.gaze.y) * (1 - Math.exp(-4.2 * delta));
     this.repel.strength +=
@@ -643,8 +711,10 @@ export class UnifiedAgentEngine {
       const burstElapsed = time - this.burstStarted;
       const burstActive = burstElapsed >= 0 && burstElapsed < BURST_DURATION;
       const burstReturn = burstActive ? ease(burstElapsed / BURST_DURATION) : 1;
-      const sceneStiffness = this.scene === 'collapse' ? 188 : this.scene === 'bars' ? 112 : 76;
-      const restingDamping = this.scene === 'collapse' ? 19 : this.scene === 'bars' ? 16 : 13.4;
+      const sceneStiffness =
+        this.scene === 'collapse' ? 188 : this.scene === 'trail' ? 126 : this.scene === 'bars' ? 112 : 76;
+      const restingDamping =
+        this.scene === 'collapse' ? 19 : this.scene === 'trail' ? 16.4 : this.scene === 'bars' ? 16 : 13.4;
       const stiffness =
         ((sceneStiffness + node.seed * 14) / node.mass) * mix(0.045, 1, burstReturn);
       const dampingRate = burstActive ? mix(5.4, restingDamping, burstReturn) : restingDamping;
@@ -709,6 +779,8 @@ export class UnifiedAgentEngine {
       context.shadowBlur = 2.7;
     }
 
+    if (this.scene === 'trail') this.drawTrailPaths(colors.particle);
+
     const ordered = [...this.nodes].sort((a, b) => a.z - b.z);
     for (const node of ordered) {
       context.globalAlpha = node.alpha;
@@ -726,5 +798,35 @@ export class UnifiedAgentEngine {
     }
     context.globalAlpha = 1;
     context.shadowBlur = 0;
+  }
+
+  private drawTrailPaths(color: string) {
+    const reveal = ease((this.sceneLocalTime - TRAIL_GLOBE_HOLD) / TRAIL_REVEAL_DURATION);
+    const burstElapsed = performance.now() - this.burstStarted;
+    if (reveal <= 0 || (burstElapsed >= 0 && burstElapsed < BURST_DURATION)) return;
+
+    const context = this.context;
+    const nodesBySlot = new Map(this.nodes.map((node) => [node.slot, node]));
+    context.save();
+    context.strokeStyle = color;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+
+    for (let leader = 0; leader < TRAIL_HEAD_COUNT; leader += 1) {
+      for (let history = TRAIL_SAMPLES - 1; history >= 1; history -= 1) {
+        const older = nodesBySlot.get(leader * TRAIL_SAMPLES + history);
+        const newer = nodesBySlot.get(leader * TRAIL_SAMPLES + history - 1);
+        if (!older || !newer) continue;
+        const progress = (TRAIL_SAMPLES - history) / (TRAIL_SAMPLES - 1);
+        context.globalAlpha = reveal * mix(0.16, 0.56, progress) * Math.min(older.alpha, newer.alpha);
+        context.lineWidth = mix(0.42, 0.9, progress);
+        context.beginPath();
+        context.moveTo(CENTER + older.x, CENTER + older.y);
+        context.lineTo(CENTER + newer.x, CENTER + newer.y);
+        context.stroke();
+      }
+    }
+
+    context.restore();
   }
 }

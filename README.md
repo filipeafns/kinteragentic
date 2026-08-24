@@ -5,7 +5,7 @@ opens in dark mode with two presentation modes:
 
 - **List** keeps the focused, unified agent at the center.
 - **Grid** opens a spatial autoplay carousel containing the current face, fast,
-  cube, collapse, tracking-bars, and globe states.
+  trail-wave, cube, collapse, tracking-bars, and globe states.
 
 The previous twelve-study implementation and its `/studies` route have been
 removed.
@@ -34,12 +34,18 @@ spirals all nodes into a nearly singular dense core in 340 ms, briefly holds,
 and releases to a natural globe. Tracking Bars align the 28 nodes into seven
 vertical columns whose positions chase up and down like a live signal.
 
+Trail Wave begins with a clean 28-dot globe while the eyes retract. It then
+resolves into seven evenly phased heads following one rotating spherical wave.
+Each head owns three progressively smaller history particles plus a thin curved
+connector, so the trail is actual recent-path memory instead of a full-frame
+blur.
+
 ## Presentation and controls
 
 The `1×`, `2×`, and `4×` controls map to 80, 160, and 320 CSS pixels. Each
 Canvas backing buffer follows device density for crisp output. Auto, face,
-fast, cube, collapse, tracking-bars, and globe controls directly select the
-current behavior. In Grid mode the same controls navigate the six carousel entries; Auto resumes its
+fast, trail-wave, cube, collapse, tracking-bars, and globe controls directly select the
+current behavior. In Grid mode the same controls navigate the seven carousel entries; Auto resumes its
 4.2-second progression. Arrow keys and card selection also move the carousel.
 
 Dark mode uses `#D9FF2F` on `#0A0506`. Light mode uses pure black on white.

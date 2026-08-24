@@ -593,6 +593,28 @@ canvas {
   width: 4px;
 }
 
+.variant-glyph--trail > span {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.variant-glyph--trail > span:nth-child(1) {
+  left: 0;
+  bottom: 1px;
+}
+
+.variant-glyph--trail > span:nth-child(2) {
+  top: 1px;
+}
+
+.variant-glyph--trail > span:nth-child(3) {
+  right: 0;
+  bottom: 3px;
+}
+
 .variant-glyph--collapse > span {
   position: absolute;
   border: 1px solid currentColor;

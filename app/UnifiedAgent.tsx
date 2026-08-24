@@ -29,6 +29,7 @@ const VARIANTS: UnifiedAgentVariant[] = [
   'auto',
   'agent',
   'fast',
+  'trail',
   'cube',
   'collapse',
   'bars',
@@ -37,6 +38,7 @@ const VARIANTS: UnifiedAgentVariant[] = [
 const CAROUSEL_STATES: AgentSoundState[] = [
   'agent',
   'fast',
+  'trail',
   'cube',
   'collapse',
   'bars',
@@ -76,11 +78,12 @@ function carouselStyle(
   const neighborScale = detail === 1 ? 1 : detail === 2 ? 0.8 : 0.54;
   const outerScale = detail === 1 ? 0.7 : detail === 2 ? 0.56 : 0.4;
   const oppositeScale = detail === 1 ? 0.48 : detail === 2 ? 0.4 : 0.28;
-  const opposite = distance === 3;
   const horizontalDistance =
     distance === 1
       ? 154 + (stageSize - 80) * 0.72
-      : 252 + (stageSize - 80) * 0.85;
+      : distance === 2
+        ? 252 + (stageSize - 80) * 0.85
+        : 335 + (stageSize - 80) * 0.96;
   const verticalDistance =
     distance === 1
       ? 116 + (stageSize - 80) * 0.28
@@ -97,7 +100,7 @@ function carouselStyle(
       outerScale,
       oppositeScale,
     ][distance]}`,
-    '--carousel-x': `${opposite ? 0 : Math.sign(delta) * horizontalDistance}px`,
+    '--carousel-x': `${Math.sign(delta) * horizontalDistance}px`,
     '--carousel-y': `${distance === 0 ? 0 : verticalDistance}px`,
     zIndex: 100 - distance,
   };
@@ -134,7 +137,13 @@ function GridGlyph() {
 
 function VariantGlyph({ variant }: { variant: UnifiedAgentVariant }) {
   const count =
-    variant === 'agent' ? 2 : variant === 'fast' || variant === 'collapse' ? 3 : variant === 'bars' ? 4 : 1;
+    variant === 'agent'
+      ? 2
+      : variant === 'fast' || variant === 'trail' || variant === 'collapse'
+        ? 3
+        : variant === 'bars'
+          ? 4
+          : 1;
   return (
     <span className={`variant-glyph variant-glyph--${variant}`} aria-hidden="true">
       {Array.from({ length: count }, (_, index) => (
