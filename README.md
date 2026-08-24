@@ -7,15 +7,16 @@ page is a single white field with a spherical black agent; the original twelve
 ## Unified spherical agent
 
 The primary agent uses 26 circles mapped directly from the supplied reference
-plus two separate solid ellipse nodes. The ellipses reproduce the tall eye
-silhouette precisely, then make one controlled 360-degree orbit, compress at
-the spherical edge, pass behind the field, and return to the mapped front pose.
-The complete field still repels locally on hover.
+plus two separate solid ellipse nodes. The circles continuously rotate across a
+shallow spherical shell, wobble independently, and flow around soft elliptical
+exclusion areas surrounding the eyes. The eyes dwell front-facing, then make a
+controlled 360-degree orbit with the same depth, silhouette compression, and
+rear fog as the field. The complete composition still repels locally on hover.
 
 The eyes blink by collapsing vertically and become circular nodes before the
-agent reorganizes into a spinning globe. Between larger forms the globe
-contracts inward. Twenty-two nodes then move forward into a checklist,
-waveform, or rotating pyramid while six remain as a small rear sphere.
+agent reorganizes. Each cycle alternates the face with one randomly selected
+globe, checklist, waveform, or rotating pyramid, then always returns to the
+face before choosing another shape.
 
 All light-mode geometry uses pure black. Depth and hierarchy come from particle
 size: dots are smallest near the projected center and become larger toward the
@@ -23,9 +24,10 @@ spherical silhouette. Rear-hemisphere fog is the sole opacity treatment,
 ranging from 30% at the back to fully opaque at the front. Every non-eye node
 is a true Canvas circle; each eye is one intentional stretched ellipse.
 
-The main canvas is physically fixed at 320 × 320 CSS pixels. The restored `1×`,
-`2×`, and `4×` controls change only its backing resolution, never its visible
-size. The original light/dark, sound, and view controls are restored above it.
+The restored `1×`, `2×`, and `4×` controls present the agent at approximately
+80 × 80, 160 × 160, and 320 × 320 CSS pixels. The Canvas backing buffer follows
+device density so each physical scale stays crisp. The original light/dark,
+sound, and view controls remain above it.
 
 ## Compact studies
 

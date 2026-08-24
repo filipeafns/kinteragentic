@@ -26,19 +26,18 @@ type Node = Target & {
   velocityZ: number;
 };
 
-type SceneStep = {
-  duration: number;
-  scene: AgentScene;
-};
-
 const LOGICAL_SIZE = 100;
 const CENTER = LOGICAL_SIZE / 2;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const NODE_COUNT = 28;
 const FOREGROUND_COUNT = 22;
+const FACE_DURATION = 11_500;
+const SHAPE_DURATION = 3_900;
+const FACE_SPHERE_RADIUS = 42;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
+const RANDOM_SHAPES: AgentScene[] = ['globe', 'checklist', 'wave', 'pyramid'];
 
 const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
   light: { background: '#FFFFFF', particle: '#000000' },
@@ -75,17 +74,6 @@ const REFERENCE_RING: ReadonlyArray<readonly [number, number, number]> = [
   [68, 84, 4.05],
 ];
 
-const SEQUENCE: SceneStep[] = [
-  { scene: 'agent', duration: 9_400 },
-  { scene: 'globe', duration: 2_500 },
-  { scene: 'checklist', duration: 3_800 },
-  { scene: 'globe', duration: 2_500 },
-  { scene: 'wave', duration: 3_800 },
-  { scene: 'globe', duration: 2_500 },
-  { scene: 'pyramid', duration: 3_800 },
-  { scene: 'globe', duration: 2_500 },
-];
-
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
 
@@ -103,8 +91,8 @@ const hash = (value: number) => {
 
 function blinkAmount(localTime: number) {
   const blinkWindows: Array<[number, number]> = [
-    [2.9, 3.45],
-    [8.7, 9.35],
+    [2.7, 3.2],
+    [9.7, 10.2],
   ];
   for (const [start, end] of blinkWindows) {
     if (localTime >= start && localTime <= end) {
@@ -115,14 +103,15 @@ function blinkAmount(localTime: number) {
 }
 
 function orbitAngle(localTime: number) {
-  const start = 5.25;
-  const end = 8.35;
-  if (localTime <= start) return 0;
-  if (localTime >= end) return TAU;
+  const start = 4.1;
+  const end = 9.45;
+  const restingWobble = Math.sin(localTime * 0.62) * 0.07;
+  if (localTime <= start) return restingWobble;
+  if (localTime >= end) return Math.sin((localTime - end) * 0.72) * 0.055;
   return ease((localTime - start) / (end - start)) * TAU;
 }
 
-function referenceAgentTargets(localTime: number, gazeY: number): Target[] {
+function eyeTargets(localTime: number, gazeY: number): Target[] {
   const rotation = orbitAngle(localTime);
   const blink = blinkAmount(localTime);
   const normalX = Math.sin(rotation);
@@ -133,23 +122,85 @@ function referenceAgentTargets(localTime: number, gazeY: number): Target[] {
   const front = clamp((normalZ + 1) * 0.5, 0, 1);
   const horizontalCompression = 0.2 + Math.abs(tangentX) * 0.8;
 
-  const eyes = [-12.2, 12.2].map((offset): Target => ({
+  return [-12.2, 12.2].map((offset): Target => ({
     alpha: 0.3 + front * 0.7,
     radiusX: 5.05 * horizontalCompression,
     radiusY: mix(12.35, 1.35, blink),
     x: normalX * faceDepth + tangentX * offset,
-    y: -1 + gazeY * 0.65,
+    y: -1 + gazeY * 0.65 + Math.sin(localTime * 0.76) * 0.35,
     z: normalZ * faceDepth + tangentZ * offset,
   }));
+}
 
-  const ring = REFERENCE_RING.map(([x, y, radius]): Target => ({
-    alpha: 1,
-    radiusX: radius,
-    radiusY: radius,
-    x: x - CENTER,
-    y: y - CENTER,
-    z: 0,
-  }));
+function avoidEyes(target: Target, eyes: Target[], index: number): Target {
+  let x = target.x;
+  let y = target.y;
+
+  for (const eye of eyes) {
+    if (eye.alpha < 0.54) continue;
+    const exclusionX = eye.radiusX + target.radiusX + 5.4;
+    const exclusionY = eye.radiusY + target.radiusY + 4.8;
+    const dx = x - eye.x;
+    const dy = y - eye.y;
+    const normalizedX = dx / exclusionX;
+    const normalizedY = dy / exclusionY;
+    const distance = Math.hypot(normalizedX, normalizedY);
+    if (distance >= 1) continue;
+
+    const fallbackAngle = index * GOLDEN_ANGLE;
+    const gradientX = dx / (exclusionX * exclusionX) || Math.cos(fallbackAngle);
+    const gradientY = dy / (exclusionY * exclusionY) || Math.sin(fallbackAngle);
+    const gradientLength = Math.max(0.001, Math.hypot(gradientX, gradientY));
+    const normalX = gradientX / gradientLength;
+    const normalY = gradientY / gradientLength;
+    const strength = Math.pow(1 - distance, 1.7);
+    x += (normalX - normalY * 0.32) * strength * 10.5;
+    y += (normalY + normalX * 0.32) * strength * 10.5;
+  }
+
+  return { ...target, x, y };
+}
+
+function flowingRingTargets(localTime: number, eyes: Target[]): Target[] {
+  const rotation = localTime * 0.255;
+  const cosine = Math.cos(rotation);
+  const sine = Math.sin(rotation);
+  const wobbleEnvelope = ease(localTime / 1.15);
+
+  return REFERENCE_RING.map(([mappedX, mappedY, mappedRadius], index): Target => {
+    const baseX = mappedX - CENTER;
+    const baseY = mappedY - CENTER;
+    const baseZ = Math.sqrt(
+      Math.max(0, FACE_SPHERE_RADIUS * FACE_SPHERE_RADIUS - baseX * baseX - baseY * baseY),
+    );
+    const rotatedX = baseX * cosine + baseZ * sine;
+    const rotatedZ = -baseX * sine + baseZ * cosine;
+    const depth = clamp((rotatedZ / FACE_SPHERE_RADIUS + 1) * 0.5, 0, 1);
+    const perspective = 1 + (rotatedZ / FACE_SPHERE_RADIUS) * 0.065;
+    const wobble = Math.sin(localTime * (0.72 + (index % 4) * 0.055) + index * 1.91);
+    const x = rotatedX * perspective;
+    const y = (baseY + wobble * 1.15 * wobbleEnvelope) * perspective;
+    const edge = clamp(Math.hypot(x, y) / FACE_SPHERE_RADIUS, 0, 1);
+    const radius = mappedRadius * (0.62 + edge * 0.38) * (0.94 + depth * 0.06);
+
+    return avoidEyes(
+      {
+        alpha: 0.3 + depth * 0.7,
+        radiusX: radius,
+        radiusY: radius,
+        x,
+        y,
+        z: rotatedZ,
+      },
+      eyes,
+      index,
+    );
+  });
+}
+
+function referenceAgentTargets(localTime: number, gazeY: number): Target[] {
+  const eyes = eyeTargets(localTime, gazeY);
+  const ring = flowingRingTargets(localTime, eyes);
 
   return [...eyes, ...ring];
 }
@@ -310,26 +361,13 @@ function targetsFor(
   scene: AgentScene,
   absoluteTime: number,
   localTime: number,
-  progress: number,
   gazeY: number,
-  sceneIndex: number,
 ): Target[] {
   switch (scene) {
     case 'agent':
       return referenceAgentTargets(localTime, gazeY);
-    case 'globe': {
-      const afterAgent = sceneIndex === 1;
-      const scale = afterAgent
-        ? progress < 0.58
-          ? 1
-          : mix(1, 0.42, ease((progress - 0.58) / 0.42))
-        : progress < 0.34
-          ? mix(0.42, 1, ease(progress / 0.34))
-          : progress < 0.64
-            ? 1
-            : mix(1, 0.42, ease((progress - 0.64) / 0.36));
-      return globeTargets(absoluteTime, scale);
-    }
+    case 'globe':
+      return globeTargets(absoluteTime, 1);
     case 'checklist':
       return checklistTargets(absoluteTime);
     case 'wave':
@@ -364,15 +402,15 @@ function assignNearest(nodes: Node[], targets: Target[]) {
 export class UnifiedAgentEngine {
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
-  private detail: UnifiedAgentDetail;
   private frame = 0;
   private gaze = { targetY: 0, y: 0 };
+  private lastShape: AgentScene = 'globe';
   private lastTime = 0;
   private nodes: Node[];
   private prefersReducedMotion: MediaQueryList;
   private repel = { active: false, strength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
-  private sceneIndex = 0;
+  private scene: AgentScene = 'agent';
   private sceneStarted = performance.now();
   private theme: UnifiedAgentTheme;
 
@@ -384,7 +422,6 @@ export class UnifiedAgentEngine {
     if (!context) throw new Error('Canvas 2D is unavailable.');
     this.canvas = canvas;
     this.context = context;
-    this.detail = options.detail;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const firstTargets = referenceAgentTargets(0, 0);
@@ -422,7 +459,7 @@ export class UnifiedAgentEngine {
   }
 
   setDetail(detail: UnifiedAgentDetail) {
-    this.detail = detail;
+    void detail;
     this.resize();
     this.draw();
   }
@@ -435,7 +472,7 @@ export class UnifiedAgentEngine {
   private resize = () => {
     const bounds = this.canvas.getBoundingClientRect();
     const cssSize = Math.max(1, Math.min(bounds.width || 320, bounds.height || 320));
-    const renderSize = Math.round(cssSize * this.detail);
+    const renderSize = Math.round(cssSize * Math.min(window.devicePixelRatio || 1, 2));
     if (this.canvas.width === renderSize && this.canvas.height === renderSize) return;
     this.canvas.width = renderSize;
     this.canvas.height = renderSize;
@@ -462,10 +499,15 @@ export class UnifiedAgentEngine {
   };
 
   private beginScene(time: number) {
-    this.sceneIndex = (this.sceneIndex + 1) % SEQUENCE.length;
+    if (this.scene === 'agent') {
+      const candidates = RANDOM_SHAPES.filter((scene) => scene !== this.lastShape);
+      this.scene = candidates[Math.floor(Math.random() * candidates.length)] ?? 'globe';
+      this.lastShape = this.scene;
+    } else {
+      this.scene = 'agent';
+    }
     this.sceneStarted = time;
-    const step = SEQUENCE[this.sceneIndex];
-    const targets = targetsFor(step.scene, time * 0.001, 0, 0, this.gaze.y, this.sceneIndex);
+    const targets = targetsFor(this.scene, time * 0.001, 0, this.gaze.y);
     assignNearest(this.nodes, targets);
     for (const node of this.nodes) {
       node.activation = time + Math.pow(node.seed, 1.7) * 130;
@@ -483,10 +525,10 @@ export class UnifiedAgentEngine {
   private tick = (time: number) => {
     const delta = this.lastTime ? Math.min(1 / 30, (time - this.lastTime) / 1000) : 0;
     this.lastTime = time;
-    const step = SEQUENCE[this.sceneIndex];
     const elapsed = time - this.sceneStarted;
+    const duration = this.scene === 'agent' ? FACE_DURATION : SHAPE_DURATION;
     if (!this.prefersReducedMotion.matches) {
-      if (elapsed >= step.duration) this.beginScene(time);
+      if (elapsed >= duration) this.beginScene(time);
       this.update(time, delta);
     }
     this.draw();
@@ -494,20 +536,16 @@ export class UnifiedAgentEngine {
   };
 
   private update(time: number, delta: number) {
-    const step = SEQUENCE[this.sceneIndex];
     const elapsed = time - this.sceneStarted;
     const localTime = elapsed * 0.001;
-    const progress = clamp(elapsed / step.duration, 0, 1);
     this.gaze.y += (this.gaze.targetY - this.gaze.y) * (1 - Math.exp(-4.2 * delta));
     this.repel.strength +=
       ((this.repel.active ? 1 : 0) - this.repel.strength) * (1 - Math.exp(-13 * delta));
     const targets = targetsFor(
-      step.scene,
+      this.scene,
       time * 0.001,
       localTime,
-      progress,
       this.gaze.y,
-      this.sceneIndex,
     );
 
     for (const node of this.nodes) {

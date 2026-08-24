@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import {
   configureSoundSystem,
   playControlSound,
@@ -49,6 +49,7 @@ export function UnifiedAgent() {
   const [theme, setTheme] = useState<UnifiedAgentTheme>('light');
   const initialDetail = useRef(detail);
   const initialTheme = useRef(theme);
+  const stageSize = detail * 80;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -126,25 +127,29 @@ export function UnifiedAgent() {
         </div>
       </div>
 
-      <section className="unified-agent-stage" aria-label="Unified magnetic agent">
+      <section
+        className="unified-agent-stage"
+        aria-label={`Unified magnetic agent at ${stageSize} pixels`}
+        style={{ '--agent-size': `${stageSize}px` } as CSSProperties}
+      >
         <canvas
           ref={canvasRef}
           className="unified-agent-canvas"
           role="img"
-          aria-label="A fixed-size particle agent with two solid oval eyes and a mapped circular field"
+          aria-label="A rotating particle agent whose dots flow around two solid oval eyes"
           onPointerEnter={() => {
             if (soundEnabled) playHoverSignature('agent-tall');
           }}
         />
       </section>
 
-      <div className="detail-controls" role="group" aria-label="Canvas render density">
+      <div className="detail-controls" role="group" aria-label="Agent display size">
         {([1, 2, 4] as const).map((value) => (
           <button
             key={value}
             type="button"
             className={detail === value ? 'is-active' : ''}
-            aria-label={`Render canvas at ${value} times density`}
+            aria-label={`Display agent at ${value * 80} pixels`}
             aria-pressed={detail === value}
             onClick={() => {
               if (value !== detail && soundEnabled) playControlSound('tick', 0.09);
