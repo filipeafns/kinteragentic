@@ -1,4 +1,16 @@
-export type MagneticShape = 'loader' | 'grid' | 'cube' | 'sphere' | 'cloud';
+export type MagneticShape =
+  | 'loader'
+  | 'grid'
+  | 'cube'
+  | 'sphere'
+  | 'cloud'
+  | 'check'
+  | 'spreadsheet'
+  | 'columns'
+  | 'pyramid'
+  | 'diamond'
+  | 'helix'
+  | 'wave';
 
 type Vec3 = {
   size: number;
@@ -189,6 +201,173 @@ function cloudTargets(phase: number, variant: number): Vec3[] {
   });
 }
 
+function checkTargets(phase: number, variant: number): Vec3[] {
+  const rotation = Math.sin(phase * 0.22 + variant) * 0.025;
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const firstSegment = index < 28;
+    const localIndex = firstSegment ? index : index - 28;
+    const samples = firstSegment ? 14 : 22;
+    const step = Math.floor(localIndex / 2);
+    const lane = localIndex % 2 === 0 ? -1 : 1;
+    const progress = step / (samples - 1);
+    const start = firstSegment ? { x: -10.5, y: -0.6 } : { x: -3.1, y: 6.7 };
+    const end = firstSegment ? { x: -3.1, y: 6.7 } : { x: 11.2, y: -8.7 };
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    const x = start.x + dx * progress + (-dy / length) * lane * 0.31;
+    const y = start.y + dy * progress + (dx / length) * lane * 0.31;
+    return {
+      size: 0.48 + hash(index * 1.91 + variant * 9) * 0.26,
+      tone: 0.2 + hash(index * 0.67 + variant) * 0.24,
+      x: x * Math.cos(rotation) - y * Math.sin(rotation),
+      y: x * Math.sin(rotation) + y * Math.cos(rotation),
+      z: 0,
+    };
+  });
+}
+
+function spreadsheetTargets(phase: number, variant: number): Vec3[] {
+  const drift = Math.sin(phase * 0.3 + variant) * 0.08;
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    if (index < 36) {
+      const row = Math.floor(index / 9);
+      const columnPoint = index % 9;
+      return {
+        size: 0.45 + hash(index + variant * 13) * 0.18,
+        tone: row === 0 ? 0.16 : 0.4 + (columnPoint % 3) * 0.08,
+        x: -10.5 + (columnPoint / 8) * 21,
+        y: -8.25 + (row / 3) * 16.5 + drift,
+        z: 0,
+      };
+    }
+
+    const localIndex = index - 36;
+    const column = Math.floor(localIndex / 6);
+    const rowPoint = localIndex % 6;
+    return {
+      size: 0.45 + hash(index + variant * 13) * 0.18,
+      tone: column === 0 ? 0.2 : 0.46 + (rowPoint % 2) * 0.08,
+      x: -10.5 + (column / 5) * 21,
+      y: -8.25 + (rowPoint / 5) * 16.5 + drift,
+      z: 0,
+    };
+  });
+}
+
+function columnTargets(phase: number, variant: number): Vec3[] {
+  const heights = [0.48, 0.82, 0.62, 1, 0.7, 0.9];
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const column = index % 6;
+    const level = Math.floor(index / 6);
+    const breathing = 1 + Math.sin(phase * 0.56 + column * 0.72 + variant) * 0.018;
+    const height = heights[column] * breathing;
+    return {
+      size: 0.53 + hash(index * 2.27 + variant * 15) * 0.22,
+      tone: 0.18 + column * 0.085,
+      x: -10.25 + column * 4.1,
+      y: 9.4 - (level / 11) * height * 18.8,
+      z: 0,
+    };
+  });
+}
+
+const PYRAMID_EDGES: Array<[number, number, number, number, number, number]> = [
+  [0, -1.25, 0, -1, 0.9, -1],
+  [0, -1.25, 0, 1, 0.9, -1],
+  [0, -1.25, 0, 1, 0.9, 1],
+  [0, -1.25, 0, -1, 0.9, 1],
+  [-1, 0.9, -1, 1, 0.9, -1],
+  [1, 0.9, -1, 1, 0.9, 1],
+  [1, 0.9, 1, -1, 0.9, 1],
+  [-1, 0.9, 1, -1, 0.9, -1],
+];
+
+function pyramidTargets(phase: number, variant: number): Vec3[] {
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const edge = PYRAMID_EDGES[Math.floor(index / 9)];
+    const progress = (index % 9) / 8;
+    let point: Vec3 = {
+      size: 0.49 + hash(index * 1.49 + variant * 19) * 0.25,
+      tone: 0.34,
+      x: edge[0] + (edge[3] - edge[0]) * progress,
+      y: edge[1] + (edge[4] - edge[1]) * progress,
+      z: edge[2] + (edge[5] - edge[2]) * progress,
+    };
+    point = rotateY(point, phase * 0.55 + variant * 0.24);
+    point = rotateX(point, -0.18 + Math.sin(phase * 0.2 + variant) * 0.08);
+    return project(point, 4.5, 8.4);
+  });
+}
+
+const DIAMOND_EDGES: Array<[number, number, number, number, number, number]> = [
+  [0, -1.25, 0, -1, 0, 0],
+  [0, -1.25, 0, 0, 0, -1],
+  [0, -1.25, 0, 1, 0, 0],
+  [0, -1.25, 0, 0, 0, 1],
+  [0, 1.25, 0, -1, 0, 0],
+  [0, 1.25, 0, 0, 0, -1],
+  [0, 1.25, 0, 1, 0, 0],
+  [0, 1.25, 0, 0, 0, 1],
+  [-1, 0, 0, 0, 0, -1],
+  [0, 0, -1, 1, 0, 0],
+  [1, 0, 0, 0, 0, 1],
+  [0, 0, 1, -1, 0, 0],
+];
+
+function diamondTargets(phase: number, variant: number): Vec3[] {
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const edge = DIAMOND_EDGES[Math.floor(index / 6)];
+    const progress = (index % 6) / 5;
+    let point: Vec3 = {
+      size: 0.48 + hash(index * 2.73 + variant * 7) * 0.28,
+      tone: 0.36,
+      x: edge[0] + (edge[3] - edge[0]) * progress,
+      y: edge[1] + (edge[4] - edge[1]) * progress,
+      z: edge[2] + (edge[5] - edge[2]) * progress,
+    };
+    point = rotateY(point, phase * 0.62 + variant * 0.31);
+    point = rotateX(point, -0.14 + Math.sin(phase * 0.26 + variant) * 0.1);
+    return project(point, 4.6, 8.6);
+  });
+}
+
+function helixTargets(phase: number, variant: number): Vec3[] {
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const strand = Math.floor(index / 36);
+    const localIndex = index % 36;
+    const progress = localIndex / 35;
+    const angle = progress * Math.PI * 3.8 + strand * Math.PI + phase * 0.72 + variant * 0.2;
+    const point: Vec3 = {
+      size: 0.46 + hash(index * 3.03 + variant * 5) * 0.25,
+      tone: strand === 0 ? 0.28 : 0.52,
+      x: Math.cos(angle),
+      y: (progress - 0.5) * 2.35,
+      z: Math.sin(angle),
+    };
+    return project(point, 5.2, 7.6);
+  });
+}
+
+function waveTargets(phase: number, variant: number): Vec3[] {
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const lane = Math.floor(index / 24);
+    const localIndex = index % 24;
+    const progress = localIndex / 23;
+    const x = -10.8 + progress * 21.6;
+    const y =
+      (lane - 1) * 5.15 +
+      Math.sin(progress * TAU * 1.45 + phase * 0.78 + lane * 0.72 + variant * 0.18) * 2.05;
+    return {
+      size: 0.45 + hash(index * 2.19 + variant * 21) * 0.3,
+      tone: 0.24 + lane * 0.2,
+      x,
+      y,
+      z: 0,
+    };
+  });
+}
+
 function targetsFor(shape: MagneticShape, phase: number, variant: number): Vec3[] {
   switch (shape) {
     case 'loader':
@@ -201,6 +380,20 @@ function targetsFor(shape: MagneticShape, phase: number, variant: number): Vec3[
       return sphereTargets(phase, variant);
     case 'cloud':
       return cloudTargets(phase, variant);
+    case 'check':
+      return checkTargets(phase, variant);
+    case 'spreadsheet':
+      return spreadsheetTargets(phase, variant);
+    case 'columns':
+      return columnTargets(phase, variant);
+    case 'pyramid':
+      return pyramidTargets(phase, variant);
+    case 'diamond':
+      return diamondTargets(phase, variant);
+    case 'helix':
+      return helixTargets(phase, variant);
+    case 'wave':
+      return waveTargets(phase, variant);
   }
 }
 

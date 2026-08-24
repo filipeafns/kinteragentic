@@ -39,10 +39,10 @@ canvas {
 
 .morph-gallery {
   display: grid;
-  grid-template-columns: repeat(6, 40px);
+  grid-template-columns: repeat(4, 40px);
   align-items: center;
   justify-content: center;
-  gap: clamp(26px, 4.4vw, 58px);
+  gap: clamp(38px, 5.2vw, 62px);
   padding: 40px;
 }
 
@@ -62,16 +62,17 @@ canvas {
   background: #ffffff;
 }
 
-@media (max-width: 620px) {
+@media (max-width: 560px) {
   .morph-gallery {
     grid-template-columns: repeat(3, 40px);
-    gap: 42px 52px;
+    gap: 42px 50px;
     padding: 32px;
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 360px) {
   .morph-gallery {
-    gap: 36px 40px;
+    grid-template-columns: repeat(2, 40px);
+    gap: 34px 48px;
   }
 }

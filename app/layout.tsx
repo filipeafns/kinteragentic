@@ -16,10 +16,10 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://magnetic-morph-studies.filipeafns.chatgpt.site'),
   title: 'Magnetic Morph Studies',
   description:
-    'Six contained particle studies morphing between loaders, grids, cubes, spheres, and amorphic clouds.',
+    'Twelve contained particle studies morphing between data forms, geometric solids, and amorphic clouds.',
   openGraph: {
     title: 'Magnetic Morph Studies',
-    description: 'Opaque particle reorganization in six contained 40-pixel studies.',
+    description: 'Opaque particle reorganization in twelve contained 40-pixel studies.',
     images: [
       {
         url: '/og.png',
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Magnetic Morph Studies',
-    description: 'Opaque particle reorganization in six contained 40-pixel studies.',
+    description: 'Opaque particle reorganization in twelve contained 40-pixel studies.',
     images: ['/og.png'],
   },
 };

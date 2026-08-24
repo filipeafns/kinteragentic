@@ -1,8 +1,7 @@
 # Magnetic Morph Studies
 
-Six 40 × 40 pixel Canvas 2D studies that continuously reorganize one fixed set
-of opaque particles into five forms: loader, grid, cube, sphere, and amorphic
-cloud.
+Twelve 40 × 40 pixel Canvas 2D studies that continuously reorganize one fixed
+set of opaque particles into data forms, geometric solids, and amorphic forms.
 
 ## Reference behavior extracted from Magnets
 
@@ -48,9 +47,18 @@ variation carries depth and hierarchy instead of opacity.
 - **Sphere:** a Fibonacci sphere projected with depth-based size and tone.
 - **Cloud:** three overlapping deterministic lobes with subtle breathing and
   deformation.
+- **Check:** paired dotted lanes sampled across a two-segment check mark.
+- **Spreadsheet:** horizontal and vertical point rules that resolve into table
+  cells with a darker header edge.
+- **Columns:** six compact data columns with distinct heights and tones.
+- **Pyramid:** a rotating square pyramid sampled across its eight edges.
+- **Diamond:** a rotating octahedron made from twelve sampled edges.
+- **Helix:** two depth-aware strands that rotate without changing particle
+  identity.
+- **Wave:** three gently moving data ribbons.
 
-Each of the six studies uses a different order, starting offset, rotation phase,
-and tempo while sharing the same motion system.
+Each of the twelve studies uses a different order, starting offset, rotation
+phase, and tempo while sharing the same motion system.
 
 ## Local development
 
