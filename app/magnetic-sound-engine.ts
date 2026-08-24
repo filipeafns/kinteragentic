@@ -1,5 +1,6 @@
 import { play, setEnabled, setVolume, type SoundName } from 'cuelume';
-import type { MagneticShape } from './magnetic-morph-engine';
+
+export type AgentSoundState = 'agent' | 'globe' | 'cube' | 'fast';
 
 type SoundLayer = {
   cue: SoundName;
@@ -18,70 +19,22 @@ const layer = (cue: SoundName, delay: number, volume: number): SoundLayer => ({
   volume,
 });
 
-const SOUND_SIGNATURES: Record<MagneticShape, SoundSignature> = {
-  loader: {
-    hover: [layer('tick', 0, 0.16), layer('loading', 38, 0.12)],
-    focus: [layer('tick', 0, 0.2), layer('loading', 42, 0.19), layer('pulse', 128, 0.13)],
+const SOUND_SIGNATURES: Record<AgentSoundState, SoundSignature> = {
+  agent: {
+    hover: [layer('tick', 0, 0.14), layer('pulse', 34, 0.09)],
+    focus: [layer('tick', 0, 0.17), layer('pulse', 46, 0.13), layer('chime', 128, 0.1)],
   },
-  grid: {
-    hover: [layer('tick', 0, 0.16), layer('scan', 34, 0.1)],
-    focus: [layer('tick', 0, 0.19), layer('scan', 38, 0.18), layer('page', 116, 0.11)],
+  globe: {
+    hover: [layer('tick', 0, 0.14), layer('bloom', 34, 0.1)],
+    focus: [layer('bloom', 0, 0.17), layer('tick', 48, 0.16), layer('sparkle', 138, 0.11)],
   },
   cube: {
     hover: [layer('tick', 0, 0.16), layer('page', 42, 0.1)],
     focus: [layer('page', 0, 0.17), layer('tick', 48, 0.18), layer('ready', 132, 0.12)],
   },
-  sphere: {
-    hover: [layer('tick', 0, 0.14), layer('bloom', 34, 0.1)],
-    focus: [layer('bloom', 0, 0.17), layer('tick', 48, 0.16), layer('sparkle', 138, 0.11)],
-  },
-  cloud: {
-    hover: [layer('tick', 0, 0.12), layer('whisper', 34, 0.1)],
-    focus: [layer('whisper', 0, 0.17), layer('bloom', 54, 0.14), layer('chime', 142, 0.1)],
-  },
-  check: {
-    hover: [layer('tick', 0, 0.16), layer('release', 36, 0.11)],
-    focus: [layer('tick', 0, 0.18), layer('release', 42, 0.14), layer('success', 122, 0.13)],
-  },
-  spreadsheet: {
-    hover: [layer('tick', 0, 0.15), layer('page', 34, 0.1)],
-    focus: [layer('tick', 0, 0.19), layer('page', 40, 0.15), layer('scan', 126, 0.11)],
-  },
-  columns: {
-    hover: [layer('tick', 0, 0.15), layer('pulse', 36, 0.1)],
-    focus: [layer('tick', 0, 0.18), layer('scan', 38, 0.16), layer('pulse', 118, 0.12)],
-  },
-  pyramid: {
-    hover: [layer('tick', 0, 0.15), layer('ready', 40, 0.09)],
-    focus: [layer('page', 0, 0.15), layer('tick', 46, 0.18), layer('ready', 132, 0.13)],
-  },
-  diamond: {
-    hover: [layer('tick', 0, 0.14), layer('sparkle', 38, 0.1)],
-    focus: [layer('tick', 0, 0.17), layer('sparkle', 42, 0.15), layer('chime', 128, 0.11)],
-  },
-  helix: {
-    hover: [layer('tick', 0, 0.14), layer('scan', 34, 0.1)],
-    focus: [layer('scan', 0, 0.17), layer('pulse', 50, 0.14), layer('sparkle', 136, 0.1)],
-  },
-  wave: {
-    hover: [layer('tick', 0, 0.13), layer('droplet', 34, 0.1)],
-    focus: [layer('droplet', 0, 0.16), layer('whisper', 48, 0.13), layer('chime', 138, 0.1)],
-  },
-  checklist: {
-    hover: [layer('tick', 0, 0.15), layer('success', 38, 0.09)],
-    focus: [layer('page', 0, 0.14), layer('tick', 42, 0.17), layer('success', 124, 0.12)],
-  },
-  'agent-round': {
-    hover: [layer('tick', 0, 0.13), layer('bloom', 36, 0.09)],
-    focus: [layer('whisper', 0, 0.14), layer('tick', 44, 0.16), layer('arrival', 132, 0.1)],
-  },
-  'agent-tall': {
-    hover: [layer('tick', 0, 0.14), layer('pulse', 34, 0.09)],
-    focus: [layer('tick', 0, 0.17), layer('pulse', 46, 0.13), layer('chime', 128, 0.1)],
-  },
-  'agent-long': {
-    hover: [layer('tick', 0, 0.13), layer('scan', 36, 0.09)],
-    focus: [layer('whisper', 0, 0.13), layer('scan', 44, 0.14), layer('ready', 132, 0.1)],
+  fast: {
+    hover: [layer('tick', 0, 0.15), layer('scan', 28, 0.1)],
+    focus: [layer('scan', 0, 0.17), layer('tick', 36, 0.16), layer('pulse', 104, 0.12)],
   },
 };
 
@@ -110,15 +63,15 @@ export function playControlSound(cue: SoundName, volume = 0.14) {
   play(cue, { volume });
 }
 
-export function playFocusSignature(shape: MagneticShape) {
-  schedule(SOUND_SIGNATURES[shape].focus, true);
+export function playFocusSignature(state: AgentSoundState) {
+  schedule(SOUND_SIGNATURES[state].focus, true);
 }
 
-export function playHoverSignature(shape: MagneticShape) {
+export function playHoverSignature(state: AgentSoundState) {
   const now = performance.now();
   if (now - lastHoverAt < 150) return;
   lastHoverAt = now;
-  schedule(SOUND_SIGNATURES[shape].hover);
+  schedule(SOUND_SIGNATURES[state].hover);
 }
 
 export function stopSoundSequences() {

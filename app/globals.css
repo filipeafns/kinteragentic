@@ -54,22 +54,6 @@ body {
   touch-action: none;
 }
 
-.agent-view-glyph {
-  display: flex;
-  width: 14px;
-  height: 14px;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-
-.agent-view-glyph span {
-  width: 3px;
-  height: 9px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
 .unified-agent-page .view-switch__button:focus-visible,
 .unified-agent-page .unified-agent-canvas:focus-visible {
   outline: 1px solid var(--accent);
@@ -89,9 +73,7 @@ canvas {
 }
 
 .morph-experience {
-  --detail-scale: 1;
   --surface: #0a0506;
-  --card-surface: #141208;
   --accent: #d9ff2f;
   --control-border: rgba(217, 255, 47, 0.16);
   --control-surface: rgba(217, 255, 47, 0.065);
@@ -108,7 +90,6 @@ canvas {
 
 .morph-experience.theme--light {
   --surface: #ffffff;
-  --card-surface: #f6f6f6;
   --accent: #242424;
   --control-border: rgba(10, 5, 6, 0.12);
   --control-surface: rgba(10, 5, 6, 0.045);
@@ -323,8 +304,8 @@ canvas {
 .sound-toggle:focus-visible,
 .theme-switch:focus-visible,
 .detail-controls button:focus-visible,
-.morph-study__button:focus-visible,
-.morph-gallery:focus-visible {
+.agent-carousel__button:focus-visible,
+.agent-carousel:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 3px;
 }
@@ -335,112 +316,46 @@ canvas {
   height: 14px;
 }
 
-.view-glyph--grid {
+.view-glyph--list {
   align-content: center;
   gap: 2px;
 }
 
-.view-glyph--grid > span {
+.view-glyph--list > span {
   width: 13px;
   height: 1.5px;
   border-radius: 99px;
   background: currentColor;
 }
 
-.view-glyph--carousel {
+.view-glyph--grid {
   grid-template-columns: repeat(2, 4px);
   grid-template-rows: repeat(2, 4px);
   place-content: center;
   gap: 2px;
 }
 
-.view-glyph--carousel > span {
+.view-glyph--grid > span {
   border: 1px solid currentColor;
   border-radius: 1.5px;
 }
 
-.morph-gallery {
-  outline: none;
-}
-
-.morph-study {
-  margin: 0;
-  will-change: transform, filter, opacity;
-}
-
-.morph-study__button {
-  display: grid;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  place-items: center;
-  overflow: hidden;
-  border: 0;
-  border-radius: inherit;
-  color: inherit;
-  background: transparent;
-  cursor: pointer;
-}
-
-.morph-canvas {
-  display: block;
-  flex: 0 0 auto;
-  width: calc(40px * var(--detail-scale));
-  height: calc(40px * var(--detail-scale));
-  aspect-ratio: 1;
-  background: var(--surface);
-}
-
-.view--carousel .morph-canvas {
-  width: 100%;
-  height: 100%;
-  background: var(--card-surface);
-}
-
-.view--grid {
-  display: grid;
-  place-items: center;
-}
-
-.view--grid .morph-gallery {
-  display: grid;
-  grid-template-columns: repeat(4, calc(40px * var(--detail-scale)));
-  max-width: 100%;
-  max-height: 100svh;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(38px, 5.2vw, 62px);
-  overflow: auto;
-  padding: 112px 40px 40px;
-  scrollbar-width: none;
-}
-
-.view--grid .morph-gallery::-webkit-scrollbar {
-  display: none;
-}
-
-.view--grid .morph-study {
-  position: relative;
-  width: calc(40px * var(--detail-scale));
-  height: calc(40px * var(--detail-scale));
-  overflow: hidden;
-  border-radius: 0;
-  contain: strict;
-}
-
-.view--carousel .morph-gallery {
+.agent-carousel {
   position: absolute;
   inset: 0;
   overflow: hidden;
+  outline: none;
 }
 
-.view--carousel .morph-study {
+.agent-carousel__item {
   position: absolute;
-  top: 47%;
+  top: 44%;
   left: 50%;
-  width: calc(68px * var(--detail-scale));
-  height: calc(68px * var(--detail-scale));
-  border-radius: clamp(18px, calc(18px * var(--detail-scale)), 48px);
+  width: var(--agent-size);
+  height: var(--agent-size);
+  margin: 0;
+  overflow: hidden;
+  border-radius: clamp(18px, calc(var(--agent-size) * 0.24), 56px);
   opacity: var(--carousel-opacity);
   filter: blur(var(--carousel-blur));
   transform:
@@ -450,54 +365,48 @@ canvas {
     transform 920ms cubic-bezier(0.22, 1, 0.36, 1),
     opacity 620ms ease,
     filter 620ms ease;
+  will-change: transform, filter, opacity;
 }
 
-.view--carousel .morph-study__button {
+.agent-carousel__button {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  place-items: center;
+  overflow: hidden;
   border: 1px solid rgba(217, 255, 47, 0.12);
-  background: var(--card-surface);
+  border-radius: inherit;
+  color: inherit;
+  background: var(--surface);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
     0 16px 36px rgba(0, 0, 0, 0.26);
+  cursor: pointer;
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
 
-.theme--light.view--carousel .morph-study__button {
+.theme--light .agent-carousel__button {
   border-color: rgba(10, 5, 6, 0.1);
-  background: var(--card-surface);
+  background: var(--surface);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.78),
     0 14px 34px rgba(10, 5, 6, 0.08);
 }
 
-.view--carousel .morph-study[data-selected='true'] .morph-study__button {
+.agent-carousel__item[data-selected='true'] .agent-carousel__button {
   border-color: rgba(217, 255, 47, 0.28);
-  background: var(--card-surface);
+  background: var(--surface);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     0 0 34px rgba(217, 255, 47, 0.075),
     0 20px 48px rgba(0, 0, 0, 0.34);
 }
 
-.theme--light.view--carousel .morph-study[data-selected='true'] .morph-study__button {
+.theme--light .agent-carousel__item[data-selected='true'] .agent-carousel__button {
   border-color: rgba(10, 5, 6, 0.16);
-  background: var(--card-surface);
-}
-
-.carousel-caption {
-  position: absolute;
-  top: calc(47% + (54px * var(--detail-scale)) + 20px);
-  left: 50%;
-  margin: 0;
-  color: var(--accent);
-  transform: translateX(-50%);
-  font-family: var(--font-geist-mono), monospace;
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  white-space: nowrap;
+  background: var(--surface);
 }
 
 .agent-bottom-controls {
@@ -708,40 +617,11 @@ canvas {
   background: #0a0506;
 }
 
-@media (max-width: 560px) {
-  .view--grid .morph-gallery {
-    grid-template-columns: repeat(3, calc(40px * var(--detail-scale)));
-    gap: 42px 50px;
-    padding: 104px 32px 32px;
-  }
-
-  .view--grid[data-detail-scale='4'] .morph-gallery {
-    grid-template-columns: repeat(2, calc(40px * var(--detail-scale)));
-  }
-
-  .view--carousel[data-detail-scale='1'] .morph-gallery {
-    inset: -12.5%;
-    transform: scale(0.8);
-  }
-}
-
-@media (max-width: 360px) {
-  .view--grid .morph-gallery {
-    grid-template-columns: repeat(2, calc(40px * var(--detail-scale)));
-    gap: 34px 48px;
-  }
-
-  .view--grid[data-detail-scale='2'] .morph-gallery,
-  .view--grid[data-detail-scale='4'] .morph-gallery {
-    grid-template-columns: calc(40px * var(--detail-scale));
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .morph-experience,
   .theme-switch__thumb,
   .view-switch__button,
-  .view--carousel .morph-study {
+  .agent-carousel__item {
     transition-duration: 0ms;
   }
 }
