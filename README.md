@@ -2,9 +2,10 @@
 
 Twelve 40 × 40 pixel Canvas 2D studies that continuously reorganize one fixed
 set of opaque particles into data forms, geometric solids, and amorphic forms.
-The default dark experience uses `#0A0506` with the solid accent `#D9FF2F` and
-adapts the Shipium spatial-wheel mechanic into an autoplaying carousel. A glass
-control switches between dark/light themes and carousel/grid views.
+The experience opens in light mode and grid view. It also retains the dark
+`#0A0506` theme with solid `#D9FF2F` accents and adapts the Shipium spatial-wheel
+mechanic into an autoplaying carousel. A glass control switches between themes
+and grid/carousel views.
 
 ## Layered interaction audio
 
@@ -32,6 +33,10 @@ sequences also pass through a particle-built three-row checklist.
 The minimal bottom control switches between `1×`, `2×`, and `4×`. It changes
 both the CSS footprint and the Canvas backing resolution, so enlarged studies
 remain crisp rather than stretching a 40-pixel bitmap.
+
+In grid view the Canvas surface matches the page. In carousel view the Canvas
+fills the entire card and uses the card's exact solid surface color, eliminating
+the inset square while keeping the particle renderer opaque.
 
 ## Reference behavior extracted from Magnets
 

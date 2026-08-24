@@ -10,6 +10,7 @@ import {
 import {
   MagneticMorphEngine,
   type MagneticShape,
+  type MagneticSurface,
   type MagneticTheme,
 } from './magnetic-morph-engine';
 import {
@@ -297,7 +298,10 @@ function MorphStudy({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<MagneticMorphEngine | null>(null);
-  const initialScale = useRef(detailScale);
+  const renderScale = detailScale * (displayMode === 'carousel' ? 68 / 40 : 1);
+  const surface: MagneticSurface = displayMode === 'carousel' ? 'card' : 'page';
+  const initialScale = useRef(renderScale);
+  const initialSurface = useRef(surface);
   const initialTheme = useRef(theme);
 
   useEffect(() => {
@@ -308,6 +312,7 @@ function MorphStudy({
       offset: study.offset,
       scale: initialScale.current,
       sequence: study.sequence,
+      surface: initialSurface.current,
       tempo: study.tempo,
       theme: initialTheme.current,
       variant: index,
@@ -321,7 +326,8 @@ function MorphStudy({
   }, [index, study]);
 
   useEffect(() => engineRef.current?.setTheme(theme), [theme]);
-  useEffect(() => engineRef.current?.setScale(detailScale), [detailScale]);
+  useEffect(() => engineRef.current?.setScale(renderScale), [renderScale]);
+  useEffect(() => engineRef.current?.setSurface(surface), [surface]);
 
   return (
     <figure
@@ -352,8 +358,8 @@ function MorphStudy({
 
 export function MorphGallery() {
   const shouldReduceMotion = useReducedMotion();
-  const [theme, setTheme] = useState<MagneticTheme>('dark');
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('carousel');
+  const [theme, setTheme] = useState<MagneticTheme>('light');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('grid');
   const [selectedIndex, setSelectedIndex] = useState(8);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [detailScale, setDetailScale] = useState<DetailScale>(1);

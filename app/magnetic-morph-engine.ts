@@ -17,6 +17,7 @@ export type MagneticShape =
   | 'agent-long';
 
 export type MagneticTheme = 'light' | 'dark';
+export type MagneticSurface = 'page' | 'card';
 
 type Vec3 = {
   size: number;
@@ -49,6 +50,7 @@ type EngineOptions = {
   offset: number;
   scale: number;
   sequence: MagneticShape[];
+  surface: MagneticSurface;
   tempo: number;
   theme: MagneticTheme;
   variant: number;
@@ -57,9 +59,15 @@ type EngineOptions = {
 const PARTICLE_COUNT = 72;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const BACKGROUNDS: Record<MagneticTheme, string> = {
-  light: '#ffffff',
-  dark: '#0A0506',
+const BACKGROUNDS: Record<MagneticTheme, Record<MagneticSurface, string>> = {
+  light: {
+    page: '#FFFFFF',
+    card: '#F6F6F6',
+  },
+  dark: {
+    page: '#0A0506',
+    card: '#141208',
+  },
 };
 const PALETTES: Record<MagneticTheme, string[]> = {
   light: ['#323232', '#505050', '#747474', '#989898', '#b8b8b8'],
@@ -578,6 +586,7 @@ export class MagneticMorphEngine {
   private resizeObserver: ResizeObserver;
   private shapeIndex = 0;
   private shapeStarted = 0;
+  private surface: MagneticSurface;
   private theme: MagneticTheme;
 
   constructor(canvas: HTMLCanvasElement, options: EngineOptions) {
@@ -588,6 +597,7 @@ export class MagneticMorphEngine {
     this.context = context;
     this.detailScale = options.scale;
     this.options = options;
+    this.surface = options.surface;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.shapeIndex = Math.floor(options.offset) % options.sequence.length;
@@ -634,6 +644,11 @@ export class MagneticMorphEngine {
 
   setTheme(theme: MagneticTheme) {
     this.theme = theme;
+    this.draw();
+  }
+
+  setSurface(surface: MagneticSurface) {
+    this.surface = surface;
     this.draw();
   }
 
@@ -727,7 +742,7 @@ export class MagneticMorphEngine {
   private draw() {
     const context = this.context;
     const palette = PALETTES[this.theme];
-    context.fillStyle = BACKGROUNDS[this.theme];
+    context.fillStyle = BACKGROUNDS[this.theme][this.surface];
     context.fillRect(0, 0, 40, 40);
 
     const ordered = [...this.particles].sort((a, b) => a.size - b.size);
