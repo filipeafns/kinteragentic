@@ -1,20 +1,25 @@
+export type UnifiedAgentTheme = 'light' | 'dark';
+export type UnifiedAgentDetail = 1 | 2 | 4;
+
 type AgentScene = 'agent' | 'globe' | 'checklist' | 'wave' | 'pyramid';
 
 type Target = {
   alpha: number;
-  size: number;
+  radiusX: number;
+  radiusY: number;
   x: number;
   y: number;
   z: number;
 };
 
-type Particle = Target & {
+type Node = Target & {
   activation: number;
   alphaVelocity: number;
   hold: Target;
   mass: number;
+  radiusXVelocity: number;
+  radiusYVelocity: number;
   seed: number;
-  sizeVelocity: number;
   slot: number;
   velocityX: number;
   velocityY: number;
@@ -26,25 +31,58 @@ type SceneStep = {
   scene: AgentScene;
 };
 
-const PARTICLE_COUNT = 64;
-const EYE_PARTICLE_COUNT = 20;
-const FOREGROUND_PARTICLE_COUNT = 48;
 const LOGICAL_SIZE = 100;
 const CENTER = LOGICAL_SIZE / 2;
-const SPHERE_RADIUS = 31;
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TAU = Math.PI * 2;
-const REPEL_RADIUS = 18;
-const REPEL_FORCE = 680;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const NODE_COUNT = 28;
+const FOREGROUND_COUNT = 22;
+const REPEL_RADIUS = 13;
+const REPEL_FORCE = 520;
+
+const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
+  light: { background: '#FFFFFF', particle: '#000000' },
+  dark: { background: '#0A0506', particle: '#D9FF2F' },
+};
+
+// Directly mapped from the supplied reference. Coordinates use a 100 × 100 field.
+const REFERENCE_RING: ReadonlyArray<readonly [number, number, number]> = [
+  [41, 10, 4.05],
+  [55, 10, 4.05],
+  [23, 18, 4.05],
+  [33, 20, 2.3],
+  [46, 18, 2.3],
+  [65, 18, 2.3],
+  [75, 17, 4.05],
+  [78, 27, 2.3],
+  [13, 32, 4.05],
+  [23, 30, 2.3],
+  [86, 33, 4.05],
+  [19, 44, 2.3],
+  [81, 44, 2.3],
+  [11, 51, 4.05],
+  [89, 54, 4.05],
+  [20, 60, 2.3],
+  [79, 61, 2.3],
+  [15, 68, 4.05],
+  [84, 72, 4.05],
+  [28, 76, 2.3],
+  [72, 75, 2.3],
+  [27, 84, 4.05],
+  [38, 80, 2.3],
+  [44, 86, 4.05],
+  [58, 82, 2.3],
+  [68, 84, 4.05],
+];
 
 const SEQUENCE: SceneStep[] = [
-  { scene: 'agent', duration: 10_400 },
-  { scene: 'globe', duration: 2_400 },
-  { scene: 'checklist', duration: 4_200 },
+  { scene: 'agent', duration: 9_400 },
   { scene: 'globe', duration: 2_500 },
-  { scene: 'wave', duration: 4_200 },
+  { scene: 'checklist', duration: 3_800 },
   { scene: 'globe', duration: 2_500 },
-  { scene: 'pyramid', duration: 4_200 },
+  { scene: 'wave', duration: 3_800 },
+  { scene: 'globe', duration: 2_500 },
+  { scene: 'pyramid', duration: 3_800 },
   { scene: 'globe', duration: 2_500 },
 ];
 
@@ -63,178 +101,168 @@ const hash = (value: number) => {
   return result - Math.floor(result);
 };
 
-function mixTarget(from: Target, to: Target, amount: number): Target {
-  const progress = ease(amount);
-  return {
-    alpha: mix(from.alpha, to.alpha, progress),
-    size: mix(from.size, to.size, progress),
-    x: mix(from.x, to.x, progress),
-    y: mix(from.y, to.y, progress),
-    z: mix(from.z, to.z, progress),
-  };
+function blinkAmount(localTime: number) {
+  const blinkWindows: Array<[number, number]> = [
+    [2.9, 3.45],
+    [8.7, 9.35],
+  ];
+  for (const [start, end] of blinkWindows) {
+    if (localTime >= start && localTime <= end) {
+      return Math.sin(((localTime - start) / (end - start)) * Math.PI);
+    }
+  }
+  return 0;
 }
 
-function spherePoint(
-  index: number,
-  count: number,
-  phase: number,
-  radius = SPHERE_RADIUS,
-): Target {
-  const normalizedY = 1 - (index / Math.max(1, count - 1)) * 2;
+function orbitAngle(localTime: number) {
+  const start = 5.25;
+  const end = 8.35;
+  if (localTime <= start) return 0;
+  if (localTime >= end) return TAU;
+  return ease((localTime - start) / (end - start)) * TAU;
+}
+
+function referenceAgentTargets(localTime: number, gazeY: number): Target[] {
+  const rotation = orbitAngle(localTime);
+  const blink = blinkAmount(localTime);
+  const normalX = Math.sin(rotation);
+  const normalZ = Math.cos(rotation);
+  const tangentX = Math.cos(rotation);
+  const tangentZ = -Math.sin(rotation);
+  const faceDepth = 20;
+  const front = clamp((normalZ + 1) * 0.5, 0, 1);
+  const horizontalCompression = 0.2 + Math.abs(tangentX) * 0.8;
+
+  const eyes = [-12.2, 12.2].map((offset): Target => ({
+    alpha: 0.3 + front * 0.7,
+    radiusX: 5.05 * horizontalCompression,
+    radiusY: mix(12.35, 1.35, blink),
+    x: normalX * faceDepth + tangentX * offset,
+    y: -1 + gazeY * 0.65,
+    z: normalZ * faceDepth + tangentZ * offset,
+  }));
+
+  const ring = REFERENCE_RING.map(([x, y, radius]): Target => ({
+    alpha: 1,
+    radiusX: radius,
+    radiusY: radius,
+    x: x - CENTER,
+    y: y - CENTER,
+    z: 0,
+  }));
+
+  return [...eyes, ...ring];
+}
+
+function globePoint(index: number, phase: number, radius = 34): Target {
+  const normalizedY = 1 - (index / Math.max(1, NODE_COUNT - 1)) * 2;
   const ringRadius = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY));
   const angle = index * GOLDEN_ANGLE + phase;
   const x3d = Math.cos(angle) * ringRadius * radius;
   const y3d = normalizedY * radius;
   const z3d = Math.sin(angle) * ringRadius * radius;
-  const perspective = 1 + (z3d / Math.max(radius, 1)) * 0.085;
+  const perspective = 1 + (z3d / radius) * 0.07;
   const x = x3d * perspective;
   const y = y3d * perspective;
-  const edge = clamp(Math.hypot(x, y) / Math.max(radius, 1), 0, 1);
-  const depth = clamp((z3d / Math.max(radius, 1) + 1) * 0.5, 0, 1);
-
+  const edge = clamp(Math.hypot(x, y) / radius, 0, 1);
+  const depth = clamp((z3d / radius + 1) * 0.5, 0, 1);
+  const nodeRadius = 1.05 + Math.pow(edge, 1.5) * 2.5;
   return {
     alpha: 0.3 + depth * 0.7,
-    size: 0.68 + Math.pow(edge, 1.55) * 1.72,
+    radiusX: nodeRadius,
+    radiusY: nodeRadius,
     x,
     y,
     z: z3d,
   };
 }
 
-function globeTargets(absoluteTime: number, scale = 1): Target[] {
-  const phase = absoluteTime * 0.58;
-  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
-    const point = spherePoint(index, PARTICLE_COUNT, phase);
+function globeTargets(absoluteTime: number, scale: number): Target[] {
+  return Array.from({ length: NODE_COUNT }, (_, index) => {
+    const target = globePoint(index, absoluteTime * 0.5);
+    const scaledRadius = target.radiusX * mix(0.72, 1, scale);
     return {
-      ...point,
-      size: point.size * mix(0.7, 1, scale),
-      x: point.x * scale,
-      y: point.y * scale,
-      z: point.z * scale,
+      ...target,
+      radiusX: scaledRadius,
+      radiusY: scaledRadius,
+      x: target.x * scale,
+      y: target.y * scale,
+      z: target.z * scale,
     };
-  });
-}
-
-function blinkAmount(localTime: number) {
-  const cycle = localTime % 4;
-  if (cycle < 3.2) return 0;
-  return Math.sin(((cycle - 3.2) / 0.8) * Math.PI);
-}
-
-function agentTargets(
-  absoluteTime: number,
-  localTime: number,
-  gazeX: number,
-  gazeY: number,
-): Target[] {
-  const globe = globeTargets(absoluteTime);
-  const blink = blinkAmount(localTime);
-  const orbit = absoluteTime * 0.72 + gazeX * 0.18;
-  const normalX = Math.sin(orbit);
-  const normalZ = Math.cos(orbit);
-  const tangentX = Math.cos(orbit);
-  const tangentZ = -Math.sin(orbit);
-
-  return globe.map((globeTarget, index) => {
-    if (index >= EYE_PARTICLE_COUNT) return globeTarget;
-
-    const eye = index < EYE_PARTICLE_COUNT / 2 ? 0 : 1;
-    const localIndex = index % (EYE_PARTICLE_COUNT / 2);
-    const row = Math.floor(localIndex / 2);
-    const column = localIndex % 2;
-    const localY = (row - 2) * 2.45;
-    const ovalWidth = 1.18 * Math.sqrt(Math.max(0.16, 1 - Math.pow(localY / 6.2, 2)));
-    const localX = (column === 0 ? -1 : 1) * ovalWidth;
-    const tangentOffset = (eye === 0 ? -6.25 : 6.25) + localX;
-    const curvature = (tangentOffset * tangentOffset + localY * localY) / (SPHERE_RADIUS * 2);
-    const radial = SPHERE_RADIUS - curvature;
-    const z = normalZ * radial + tangentZ * tangentOffset;
-    const depth = clamp((z / SPHERE_RADIUS + 1) * 0.5, 0, 1);
-    const perspective = 1 + (z / SPHERE_RADIUS) * 0.085;
-    const eyeTarget: Target = {
-      alpha: 0.3 + depth * 0.7,
-      size: 2.34 * mix(0.78, 1.08, depth),
-      x: (normalX * radial + tangentX * tangentOffset) * perspective,
-      y: (localY + gazeY * 1.2) * perspective,
-      z,
-    };
-
-    return mixTarget(eyeTarget, globeTarget, blink);
   });
 }
 
 function coreTargets(absoluteTime: number): Target[] {
-  return Array.from(
-    { length: PARTICLE_COUNT - FOREGROUND_PARTICLE_COUNT },
-    (_, index) => {
-      const point = spherePoint(index, PARTICLE_COUNT - FOREGROUND_PARTICLE_COUNT, absoluteTime * 0.72, 7.4);
-      return {
-        ...point,
-        alpha: 0.3,
-        size: point.size * 0.62,
-        z: point.z - 19,
-      };
-    },
-  );
+  return Array.from({ length: NODE_COUNT - FOREGROUND_COUNT }, (_, index) => {
+    const normalizedY = 1 - (index / (NODE_COUNT - FOREGROUND_COUNT - 1)) * 2;
+    const ring = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY));
+    const angle = index * GOLDEN_ANGLE + absoluteTime * 0.54;
+    const edge = Math.hypot(Math.cos(angle) * ring, normalizedY);
+    const radius = 0.72 + edge * 0.7;
+    return {
+      alpha: 0.3,
+      radiusX: radius,
+      radiusY: radius,
+      x: Math.cos(angle) * ring * 6.5,
+      y: normalizedY * 6.5,
+      z: -18,
+    };
+  });
 }
 
 function checklistTargets(absoluteTime: number): Target[] {
-  const foreground = Array.from({ length: FOREGROUND_PARTICLE_COUNT }, (_, index) => {
-    const row = Math.floor(index / 16);
-    const localIndex = index % 16;
-    const rowY = -14 + row * 14;
-
-    if (localIndex < 6) {
+  const foreground = Array.from({ length: FOREGROUND_COUNT }, (_, index) => {
+    const row = Math.floor(index / 11);
+    const localIndex = index % 11;
+    const rowY = row === 0 ? -10 : 10;
+    if (localIndex < 4) {
       const path = [
-        { x: -21, y: rowY },
-        { x: -18.8, y: rowY + 2.4 },
-        { x: -14.5, y: rowY - 3.3 },
+        { x: -22, y: rowY },
+        { x: -18.5, y: rowY + 3 },
+        { x: -13.8, y: rowY - 4 },
       ];
-      const segment = localIndex < 3 ? 0 : 1;
-      const segmentIndex = localIndex % 3;
-      const progress = segmentIndex / 2;
-      const from = path[segment];
-      const to = path[segment + 1];
+      const segment = localIndex < 2 ? 0 : 1;
+      const progress = localIndex % 2;
       return {
         alpha: 1,
-        size: 1.45 - Math.abs(segmentIndex - 1) * 0.15,
-        x: mix(from.x, to.x, progress),
-        y: mix(from.y, to.y, progress),
+        radiusX: 1.55,
+        radiusY: 1.55,
+        x: mix(path[segment].x, path[segment + 1].x, progress),
+        y: mix(path[segment].y, path[segment + 1].y, progress),
         z: 10,
       };
     }
-
-    const lineIndex = localIndex - 6;
-    const progress = lineIndex / 9;
+    const progress = (localIndex - 4) / 6;
+    const radius = 0.9 + Math.abs(progress - 0.5) * 0.7;
     return {
       alpha: 1,
-      size: 0.72 + Math.pow(Math.abs(progress - 0.5) * 2, 1.25) * 0.62,
-      x: -7 + progress * 29,
-      y: rowY + Math.sin(absoluteTime * 0.55 + row) * 0.25,
+      radiusX: radius,
+      radiusY: radius,
+      x: -5 + progress * 29,
+      y: rowY + Math.sin(absoluteTime * 0.45 + row) * 0.18,
       z: 10,
     };
   });
-
   return [...foreground, ...coreTargets(absoluteTime)];
 }
 
 function waveTargets(absoluteTime: number): Target[] {
-  const foreground = Array.from({ length: FOREGROUND_PARTICLE_COUNT }, (_, index) => {
-    const lane = Math.floor(index / 16);
-    const localIndex = index % 16;
-    const progress = localIndex / 15;
-    const x = -25 + progress * 50;
-    const wave = Math.sin(progress * TAU * 1.35 + absoluteTime * 1.05 + lane * 0.7);
+  const foreground = Array.from({ length: FOREGROUND_COUNT }, (_, index) => {
+    const lane = Math.floor(index / 11);
+    const localIndex = index % 11;
+    const progress = localIndex / 10;
+    const wave = Math.sin(progress * TAU * 1.25 + absoluteTime * 0.9 + lane * 0.85);
     const edge = Math.abs(progress - 0.5) * 2;
+    const radius = 0.82 + Math.pow(edge, 1.35) * 1.45;
     return {
       alpha: 1,
-      size: 0.62 + Math.pow(edge, 1.35) * 1.25,
-      x,
-      y: (lane - 1) * 8 + wave * 5.2,
-      z: 10 + wave * 1.5,
+      radiusX: radius,
+      radiusY: radius,
+      x: -26 + progress * 52,
+      y: (lane === 0 ? -6 : 6) + wave * 5.2,
+      z: 10 + wave,
     };
   });
-
   return [...foreground, ...coreTargets(absoluteTime)];
 }
 
@@ -250,28 +278,31 @@ const PYRAMID_EDGES: Array<[number, number, number, number, number, number]> = [
 ];
 
 function pyramidTargets(absoluteTime: number): Target[] {
-  const rotation = absoluteTime * 0.42;
+  const rotation = absoluteTime * 0.34;
   const cosine = Math.cos(rotation);
   const sine = Math.sin(rotation);
-  const foreground = Array.from({ length: FOREGROUND_PARTICLE_COUNT }, (_, index) => {
-    const edge = PYRAMID_EDGES[Math.floor(index / 6)];
-    const progress = (index % 6) / 5;
+  const foreground = Array.from({ length: FOREGROUND_COUNT }, (_, index) => {
+    const edgeIndex = index % PYRAMID_EDGES.length;
+    const sampleIndex = Math.floor(index / PYRAMID_EDGES.length);
+    const samplesOnEdge = Math.ceil(FOREGROUND_COUNT / PYRAMID_EDGES.length);
+    const progress = sampleIndex / Math.max(1, samplesOnEdge - 1);
+    const edge = PYRAMID_EDGES[edgeIndex];
     const x3d = mix(edge[0], edge[3], progress) * 18;
     const y3d = mix(edge[1], edge[4], progress) * 18;
     const z3d = mix(edge[2], edge[5], progress) * 18;
     const rotatedX = x3d * cosine + z3d * sine;
     const rotatedZ = -x3d * sine + z3d * cosine;
     const perspective = 1 + rotatedZ / 190;
-    const edgeDistance = clamp(Math.hypot(rotatedX, y3d) / 30, 0, 1);
+    const nodeRadius = 0.95 + clamp(Math.hypot(rotatedX, y3d) / 30, 0, 1) * 1.3;
     return {
       alpha: 1,
-      size: 0.72 + edgeDistance * 1.18,
+      radiusX: nodeRadius,
+      radiusY: nodeRadius,
       x: rotatedX * perspective,
       y: y3d * perspective + 3,
       z: rotatedZ + 10,
     };
   });
-
   return [...foreground, ...coreTargets(absoluteTime)];
 }
 
@@ -280,18 +311,23 @@ function targetsFor(
   absoluteTime: number,
   localTime: number,
   progress: number,
-  gazeX: number,
   gazeY: number,
   sceneIndex: number,
 ): Target[] {
   switch (scene) {
     case 'agent':
-      return agentTargets(absoluteTime, localTime, gazeX, gazeY);
+      return referenceAgentTargets(localTime, gazeY);
     case 'globe': {
       const afterAgent = sceneIndex === 1;
       const scale = afterAgent
-        ? mix(1, 0.38, ease(progress))
-        : 0.38 + Math.sin(progress * Math.PI) * 0.62;
+        ? progress < 0.58
+          ? 1
+          : mix(1, 0.42, ease((progress - 0.58) / 0.42))
+        : progress < 0.34
+          ? mix(0.42, 1, ease(progress / 0.34))
+          : progress < 0.64
+            ? 1
+            : mix(1, 0.42, ease((progress - 0.64) / 0.36));
       return globeTargets(absoluteTime, scale);
     }
     case 'checklist':
@@ -303,27 +339,24 @@ function targetsFor(
   }
 }
 
-function assignNearest(particles: Particle[], targets: Target[]) {
+function assignNearest(nodes: Node[], targets: Target[]) {
   const available = new Set(targets.map((_, index) => index));
-  const ordered = [...particles].sort(
-    (a, b) => Math.hypot(b.x, b.y) - Math.hypot(a.x, a.y),
-  );
-
-  for (const particle of ordered) {
+  const ordered = [...nodes].sort((a, b) => Math.hypot(b.x, b.y) - Math.hypot(a.x, a.y));
+  for (const node of ordered) {
     let nearest = 0;
     let nearestDistance = Number.POSITIVE_INFINITY;
     for (const targetIndex of available) {
       const target = targets[targetIndex];
       const distance =
-        Math.pow(particle.x - target.x, 2) +
-        Math.pow(particle.y - target.y, 2) +
-        Math.abs(particle.size - target.size) * 4;
+        Math.pow(node.x - target.x, 2) +
+        Math.pow(node.y - target.y, 2) +
+        Math.abs(node.radiusX - target.radiusX) * 3;
       if (distance < nearestDistance) {
         nearest = targetIndex;
         nearestDistance = distance;
       }
     }
-    particle.slot = nearest;
+    node.slot = nearest;
     available.delete(nearest);
   }
 }
@@ -331,38 +364,44 @@ function assignNearest(particles: Particle[], targets: Target[]) {
 export class UnifiedAgentEngine {
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
+  private detail: UnifiedAgentDetail;
   private frame = 0;
-  private gaze = { targetX: 0, targetY: 0, x: 0, y: 0 };
+  private gaze = { targetY: 0, y: 0 };
   private lastTime = 0;
-  private particles: Particle[];
+  private nodes: Node[];
   private prefersReducedMotion: MediaQueryList;
   private repel = { active: false, strength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
   private sceneIndex = 0;
   private sceneStarted = performance.now();
+  private theme: UnifiedAgentTheme;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    options: { detail: UnifiedAgentDetail; theme: UnifiedAgentTheme },
+  ) {
     const context = canvas.getContext('2d', { alpha: false });
     if (!context) throw new Error('Canvas 2D is unavailable.');
-
     this.canvas = canvas;
     this.context = context;
+    this.detail = options.detail;
+    this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const firstTargets = agentTargets(this.sceneStarted * 0.001, 0, 0, 0);
-    this.particles = firstTargets.map((target, index) => ({
+    const firstTargets = referenceAgentTargets(0, 0);
+    this.nodes = firstTargets.map((target, index) => ({
       ...target,
       activation: 0,
       alphaVelocity: 0,
       hold: { ...target },
-      mass: 0.78 + hash(index * 2.7) * 0.58,
+      mass: 0.88 + hash(index * 2.7) * 0.3,
+      radiusXVelocity: 0,
+      radiusYVelocity: 0,
       seed: hash(index * 5.13),
-      sizeVelocity: 0,
       slot: index,
       velocityX: 0,
       velocityY: 0,
       velocityZ: 0,
     }));
-
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
     canvas.addEventListener('pointermove', this.updateRepel, { passive: true });
@@ -382,11 +421,21 @@ export class UnifiedAgentEngine {
     window.removeEventListener('pointermove', this.updateGaze);
   }
 
+  setDetail(detail: UnifiedAgentDetail) {
+    this.detail = detail;
+    this.resize();
+    this.draw();
+  }
+
+  setTheme(theme: UnifiedAgentTheme) {
+    this.theme = theme;
+    this.draw();
+  }
+
   private resize = () => {
     const bounds = this.canvas.getBoundingClientRect();
-    const cssSize = Math.max(1, Math.min(bounds.width || 360, bounds.height || 360));
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const renderSize = Math.round(cssSize * dpr);
+    const cssSize = Math.max(1, Math.min(bounds.width || 320, bounds.height || 320));
+    const renderSize = Math.round(cssSize * this.detail);
     if (this.canvas.width === renderSize && this.canvas.height === renderSize) return;
     this.canvas.width = renderSize;
     this.canvas.height = renderSize;
@@ -396,7 +445,6 @@ export class UnifiedAgentEngine {
   };
 
   private updateGaze = (event: PointerEvent) => {
-    this.gaze.targetX = clamp((event.clientX / window.innerWidth - 0.5) * 2, -1, 1);
     this.gaze.targetY = clamp((event.clientY / window.innerHeight - 0.5) * 2, -1, 1);
   };
 
@@ -417,25 +465,18 @@ export class UnifiedAgentEngine {
     this.sceneIndex = (this.sceneIndex + 1) % SEQUENCE.length;
     this.sceneStarted = time;
     const step = SEQUENCE[this.sceneIndex];
-    const targets = targetsFor(step.scene, time * 0.001, 0, 0, this.gaze.x, this.gaze.y, this.sceneIndex);
-    assignNearest(this.particles, targets);
-
-    for (const particle of this.particles) {
-      particle.activation = time + Math.pow(particle.seed, 1.55) * 240;
-      particle.hold = {
-        alpha: particle.alpha,
-        size: particle.size,
-        x: particle.x,
-        y: particle.y,
-        z: particle.z,
+    const targets = targetsFor(step.scene, time * 0.001, 0, 0, this.gaze.y, this.sceneIndex);
+    assignNearest(this.nodes, targets);
+    for (const node of this.nodes) {
+      node.activation = time + Math.pow(node.seed, 1.7) * 130;
+      node.hold = {
+        alpha: node.alpha,
+        radiusX: node.radiusX,
+        radiusY: node.radiusY,
+        x: node.x,
+        y: node.y,
+        z: node.z,
       };
-      const target = targets[particle.slot];
-      const dx = target.x - particle.x;
-      const dy = target.y - particle.y;
-      const distance = Math.hypot(dx, dy);
-      const curl = (particle.seed > 0.5 ? 1 : -1) * Math.min(34, distance * 1.18);
-      particle.velocityX += distance > 0.01 ? (-dy / distance) * curl : 0;
-      particle.velocityY += distance > 0.01 ? (dx / distance) * curl : 0;
     }
   }
 
@@ -444,99 +485,96 @@ export class UnifiedAgentEngine {
     this.lastTime = time;
     const step = SEQUENCE[this.sceneIndex];
     const elapsed = time - this.sceneStarted;
-
     if (!this.prefersReducedMotion.matches) {
       if (elapsed >= step.duration) this.beginScene(time);
       this.update(time, delta);
     }
-
     this.draw();
     this.frame = requestAnimationFrame(this.tick);
   };
 
   private update(time: number, delta: number) {
     const step = SEQUENCE[this.sceneIndex];
-    const localMilliseconds = time - this.sceneStarted;
-    const localTime = localMilliseconds * 0.001;
-    const progress = clamp(localMilliseconds / step.duration, 0, 1);
-    this.gaze.x += (this.gaze.targetX - this.gaze.x) * (1 - Math.exp(-5.5 * delta));
-    this.gaze.y += (this.gaze.targetY - this.gaze.y) * (1 - Math.exp(-5.5 * delta));
+    const elapsed = time - this.sceneStarted;
+    const localTime = elapsed * 0.001;
+    const progress = clamp(elapsed / step.duration, 0, 1);
+    this.gaze.y += (this.gaze.targetY - this.gaze.y) * (1 - Math.exp(-4.2 * delta));
     this.repel.strength +=
-      ((this.repel.active ? 1 : 0) - this.repel.strength) * (1 - Math.exp(-14 * delta));
-
+      ((this.repel.active ? 1 : 0) - this.repel.strength) * (1 - Math.exp(-13 * delta));
     const targets = targetsFor(
       step.scene,
       time * 0.001,
       localTime,
       progress,
-      this.gaze.x,
       this.gaze.y,
       this.sceneIndex,
     );
 
-    for (const particle of this.particles) {
-      const target = targets[particle.slot];
-      const active = time >= particle.activation;
-      const destination = active ? target : particle.hold;
-      const stiffness = (70 + particle.seed * 30) / particle.mass;
-      const damping = Math.exp((-10.8 / particle.mass) * delta);
-      particle.velocityX += (destination.x - particle.x) * stiffness * delta;
-      particle.velocityY += (destination.y - particle.y) * stiffness * delta;
-      particle.velocityZ += (destination.z - particle.z) * stiffness * delta;
+    for (const node of this.nodes) {
+      const target = targets[node.slot];
+      const destination = time >= node.activation ? target : node.hold;
+      const stiffness = (76 + node.seed * 14) / node.mass;
+      const damping = Math.exp((-13.4 / node.mass) * delta);
+      node.velocityX += (destination.x - node.x) * stiffness * delta;
+      node.velocityY += (destination.y - node.y) * stiffness * delta;
+      node.velocityZ += (destination.z - node.z) * stiffness * delta;
 
       if (this.repel.strength > 0.001) {
-        const screenX = CENTER + particle.x;
-        const screenY = CENTER + particle.y;
-        let repelX = screenX - this.repel.x;
-        let repelY = screenY - this.repel.y;
+        let repelX = CENTER + node.x - this.repel.x;
+        let repelY = CENTER + node.y - this.repel.y;
         let distance = Math.hypot(repelX, repelY);
         if (distance < 0.001) {
-          const angle = particle.seed * TAU;
+          const angle = node.seed * TAU;
           repelX = Math.cos(angle);
           repelY = Math.sin(angle);
           distance = 1;
         }
         if (distance < REPEL_RADIUS) {
           const proximity = 1 - distance / REPEL_RADIUS;
-          const force =
-            (REPEL_FORCE * proximity * proximity * this.repel.strength) / particle.mass;
-          particle.velocityX += (repelX / distance) * force * delta;
-          particle.velocityY += (repelY / distance) * force * delta;
+          const force = (REPEL_FORCE * proximity * proximity * this.repel.strength) / node.mass;
+          node.velocityX += (repelX / distance) * force * delta;
+          node.velocityY += (repelY / distance) * force * delta;
         }
       }
 
-      particle.velocityX *= damping;
-      particle.velocityY *= damping;
-      particle.velocityZ *= damping;
-      particle.x += particle.velocityX * delta;
-      particle.y += particle.velocityY * delta;
-      particle.z += particle.velocityZ * delta;
+      node.velocityX *= damping;
+      node.velocityY *= damping;
+      node.velocityZ *= damping;
+      node.x += node.velocityX * delta;
+      node.y += node.velocityY * delta;
+      node.z += node.velocityZ * delta;
 
-      particle.sizeVelocity += (destination.size - particle.size) * 86 * delta;
-      particle.sizeVelocity *= Math.exp(-12 * delta);
-      particle.size += particle.sizeVelocity * delta;
+      node.radiusXVelocity += (destination.radiusX - node.radiusX) * 92 * delta;
+      node.radiusYVelocity += (destination.radiusY - node.radiusY) * 92 * delta;
+      node.radiusXVelocity *= Math.exp(-14 * delta);
+      node.radiusYVelocity *= Math.exp(-14 * delta);
+      node.radiusX += node.radiusXVelocity * delta;
+      node.radiusY += node.radiusYVelocity * delta;
 
-      particle.alphaVelocity += (destination.alpha - particle.alpha) * 82 * delta;
-      particle.alphaVelocity *= Math.exp(-12 * delta);
-      particle.alpha = clamp(particle.alpha + particle.alphaVelocity * delta, 0.3, 1);
+      node.alphaVelocity += (destination.alpha - node.alpha) * 86 * delta;
+      node.alphaVelocity *= Math.exp(-13 * delta);
+      node.alpha = clamp(node.alpha + node.alphaVelocity * delta, 0.3, 1);
     }
   }
 
   private draw() {
     const context = this.context;
+    const colors = COLORS[this.theme];
     context.globalAlpha = 1;
-    context.fillStyle = '#ffffff';
+    context.fillStyle = colors.background;
     context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
+    context.fillStyle = colors.particle;
 
-    const ordered = [...this.particles].sort((a, b) => a.z - b.z);
-    context.fillStyle = '#000000';
-    for (const particle of ordered) {
-      context.globalAlpha = particle.alpha;
+    const ordered = [...this.nodes].sort((a, b) => a.z - b.z);
+    for (const node of ordered) {
+      context.globalAlpha = node.alpha;
       context.beginPath();
-      context.arc(
-        CENTER + particle.x,
-        CENTER + particle.y,
-        clamp(particle.size, 0.36, 2.75),
+      context.ellipse(
+        CENTER + node.x,
+        CENTER + node.y,
+        clamp(node.radiusX, 0.34, 5.2),
+        clamp(node.radiusY, 0.34, 12.5),
+        0,
         0,
         TAU,
       );

@@ -6,24 +6,26 @@ page is a single white field with a spherical black agent; the original twelve
 
 ## Unified spherical agent
 
-The primary agent owns 64 particles for its entire cycle. Forty-four particles
-make the spherical field and 20 tightly overlap into two tall oval eye masses.
-The eye masses rotate around the same 3D sphere, compress at its silhouette,
-pass behind the front particles, and reappear on the opposite side. They still
-respond subtly to pointer position and the complete field repels locally on
-hover.
+The primary agent uses 26 circles mapped directly from the supplied reference
+plus two separate solid ellipse nodes. The ellipses reproduce the tall eye
+silhouette precisely, then make one controlled 360-degree orbit, compress at
+the spherical edge, pass behind the field, and return to the mapped front pose.
+The complete field still repels locally on hover.
 
-Every four seconds the eye particles close into their corresponding globe
-positions, so a blink resolves into a complete spinning sphere instead of an
-overlaid eyelid. Between larger forms the whole globe contracts inward. Forty-
-eight particles then move forward into a checklist, waveform, or rotating
-pyramid while 16 remain as a small rear sphere.
+The eyes blink by collapsing vertically and become circular nodes before the
+agent reorganizes into a spinning globe. Between larger forms the globe
+contracts inward. Twenty-two nodes then move forward into a checklist,
+waveform, or rotating pyramid while six remain as a small rear sphere.
 
-All visible geometry uses pure black. Depth and hierarchy come from particle
+All light-mode geometry uses pure black. Depth and hierarchy come from particle
 size: dots are smallest near the projected center and become larger toward the
 spherical silhouette. Rear-hemisphere fog is the sole opacity treatment,
-ranging from 30% at the back to fully opaque at the front. Every rendered dot
-is a true Canvas circle; the oval eyes exist only because circles overlap.
+ranging from 30% at the back to fully opaque at the front. Every non-eye node
+is a true Canvas circle; each eye is one intentional stretched ellipse.
+
+The main canvas is physically fixed at 320 × 320 CSS pixels. The restored `1×`,
+`2×`, and `4×` controls change only its backing resolution, never its visible
+size. The original light/dark, sound, and view controls are restored above it.
 
 ## Compact studies
 
