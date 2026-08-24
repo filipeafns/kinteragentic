@@ -20,6 +20,19 @@ Browsers require a click, tap, or keyboard interaction before audio can start.
 After that first gesture, automatic carousel focus changes also play their
 assigned signatures.
 
+## Sentient particle states
+
+Every study now includes one agent state made from the same 72 particles as its
+other forms. The particles gather into round, tall, or long paired eye masses
+inside a sparse face orbit, blink in orchestration, follow recent pointer
+movement, and return to autonomous side-to-side glances when the pointer is
+idle. There are no overlaid eye graphics or cross-fades. Spreadsheet and data
+sequences also pass through a particle-built three-row checklist.
+
+The minimal bottom control switches between `1×`, `2×`, and `4×`. It changes
+both the CSS footprint and the Canvas backing resolution, so enlarged studies
+remain crisp rather than stretching a 40-pixel bitmap.
+
 ## Reference behavior extracted from Magnets
 
 The original magnetic system treats every visible source pixel as a physical

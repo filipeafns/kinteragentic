@@ -16,10 +16,10 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://magnetic-morph-studies.filipeafns.chatgpt.site'),
   title: 'Magnetic Morph Studies',
   description:
-    'Twelve magnetic particle studies in a dark spatial carousel and responsive grid.',
+    'Twelve magnetic particle agents morph through sentient eye states, data forms, and geometric solids.',
   openGraph: {
     title: 'Magnetic Morph Studies',
-    description: 'Opaque particle reorganization in twelve contained 40-pixel studies.',
+    description: 'Sentient eye states and opaque particle reorganization across twelve magnetic studies.',
     images: [
       {
         url: '/og.png',
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Magnetic Morph Studies',
-    description: 'Opaque particle reorganization in twelve contained 40-pixel studies.',
+    description: 'Sentient eye states and opaque particle reorganization across twelve magnetic studies.',
     images: ['/og.png'],
   },
 };

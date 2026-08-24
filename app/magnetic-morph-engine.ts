@@ -10,7 +10,11 @@ export type MagneticShape =
   | 'pyramid'
   | 'diamond'
   | 'helix'
-  | 'wave';
+  | 'wave'
+  | 'checklist'
+  | 'agent-round'
+  | 'agent-tall'
+  | 'agent-long';
 
 export type MagneticTheme = 'light' | 'dark';
 
@@ -43,6 +47,7 @@ type Particle = {
 
 type EngineOptions = {
   offset: number;
+  scale: number;
   sequence: MagneticShape[];
   tempo: number;
   theme: MagneticTheme;
@@ -60,6 +65,33 @@ const PALETTES: Record<MagneticTheme, string[]> = {
   light: ['#323232', '#505050', '#747474', '#989898', '#b8b8b8'],
   dark: ['#D9FF2F', '#B8D929', '#91AA22', '#697B1B', '#424D13'],
 };
+
+const POINTER_GAZE = {
+  lastMove: Number.NEGATIVE_INFINITY,
+  x: 0,
+  y: 0,
+};
+let gazeListenerCount = 0;
+
+function updatePointerGaze(event: PointerEvent) {
+  POINTER_GAZE.x = clamp((event.clientX / window.innerWidth - 0.5) * 2, -1, 1);
+  POINTER_GAZE.y = clamp((event.clientY / window.innerHeight - 0.5) * 2, -1, 1);
+  POINTER_GAZE.lastMove = performance.now();
+}
+
+function acquirePointerGaze() {
+  gazeListenerCount += 1;
+  if (gazeListenerCount === 1) {
+    window.addEventListener('pointermove', updatePointerGaze, { passive: true });
+  }
+}
+
+function releasePointerGaze() {
+  gazeListenerCount = Math.max(0, gazeListenerCount - 1);
+  if (gazeListenerCount === 0) {
+    window.removeEventListener('pointermove', updatePointerGaze);
+  }
+}
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value));
@@ -377,6 +409,104 @@ function waveTargets(phase: number, variant: number): Vec3[] {
   });
 }
 
+function checklistTargets(phase: number, variant: number): Vec3[] {
+  const sway = Math.sin(phase * 0.34 + variant) * 0.08;
+
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    const row = Math.floor(index / 24);
+    const localIndex = index % 24;
+    const rowY = -7 + row * 7;
+
+    if (localIndex < 10) {
+      const progress = (localIndex / 10) * 4;
+      const side = Math.floor(progress);
+      const sideProgress = progress - side;
+      const points = [
+        { x: -10.7 + sideProgress * 4, y: rowY - 2 },
+        { x: -6.7, y: rowY - 2 + sideProgress * 4 },
+        { x: -6.7 - sideProgress * 4, y: rowY + 2 },
+        { x: -10.7, y: rowY + 2 - sideProgress * 4 },
+      ];
+      const point = points[Math.min(side, 3)];
+      return {
+        size: 0.48 + hash(index + variant * 7) * 0.18,
+        tone: 0.2,
+        x: point.x,
+        y: point.y + sway,
+        z: 0,
+      };
+    }
+
+    if (localIndex < 16) {
+      const checkIndex = localIndex - 10;
+      const firstStroke = checkIndex < 3;
+      const progress = firstStroke ? checkIndex / 2 : (checkIndex - 3) / 2;
+      return {
+        size: 0.52 + hash(index + variant * 11) * 0.15,
+        tone: 0.08,
+        x: firstStroke ? -10 + progress * 1.35 : -8.65 + progress * 2.5,
+        y: firstStroke ? rowY + progress * 1.25 : rowY + 1.25 - progress * 2.8 + sway,
+        z: 0,
+      };
+    }
+
+    const lineIndex = localIndex - 16;
+    return {
+      size: 0.46 + hash(index * 1.9 + variant * 13) * 0.16,
+      tone: 0.38 + row * 0.1,
+      x: -2.7 + (lineIndex / 7) * 13.2,
+      y: rowY + sway,
+      z: 0,
+    };
+  });
+}
+
+function agentEyeTargets(
+  phase: number,
+  variant: number,
+  mode: 'agent-round' | 'agent-tall' | 'agent-long',
+): Vec3[] {
+  const dimensions = {
+    'agent-round': { x: 2.75, y: 2.75 },
+    'agent-tall': { x: 1.45, y: 4.25 },
+    'agent-long': { x: 4.15, y: 1.5 },
+  }[mode];
+  const pointerFresh = performance.now() - POINTER_GAZE.lastMove < 2400;
+  const automaticX = Math.sin(phase * 1.08 + variant * 0.73);
+  const automaticY = Math.sin(phase * 0.61 + variant * 1.11) * 0.38;
+  const gazeX = (pointerFresh ? POINTER_GAZE.x : automaticX) * 1.55;
+  const gazeY = (pointerFresh ? POINTER_GAZE.y : automaticY) * 0.72;
+  const blinkSignal = Math.max(0, (Math.cos(phase * 1.8 + variant * 1.37) - 0.955) / 0.045);
+  const eyeHeight = dimensions.y * (1 - Math.min(1, blinkSignal) * 0.84);
+
+  return Array.from({ length: PARTICLE_COUNT }, (_, index) => {
+    if (index < 52) {
+      const eye = index < 26 ? 0 : 1;
+      const localIndex = index % 26;
+      const radius = Math.sqrt((localIndex + 0.45) / 26);
+      const angle = localIndex * GOLDEN_ANGLE + eye * 0.24;
+      return {
+        size: 0.54 + hash(index * 2.17 + variant * 19) * 0.3,
+        tone: 0.015 + hash(index + variant) * 0.08,
+        x: (eye === 0 ? -5.15 : 5.15) + gazeX + Math.cos(angle) * radius * dimensions.x,
+        y: gazeY + Math.sin(angle) * radius * eyeHeight,
+        z: 0,
+      };
+    }
+
+    const localIndex = index - 52;
+    const angle = (localIndex / 20) * TAU + phase * 0.06;
+    const pulse = 1 + Math.sin(phase * 0.7 + localIndex * 0.43 + variant) * 0.035;
+    return {
+      size: 0.4 + hash(index * 3.13 + variant * 29) * 0.34,
+      tone: 0.42 + hash(index * 0.91 + variant) * 0.38,
+      x: Math.cos(angle) * 11.4 * pulse,
+      y: Math.sin(angle) * 9.5 / pulse,
+      z: 0,
+    };
+  });
+}
+
 function targetsFor(shape: MagneticShape, phase: number, variant: number): Vec3[] {
   switch (shape) {
     case 'loader':
@@ -403,6 +533,12 @@ function targetsFor(shape: MagneticShape, phase: number, variant: number): Vec3[
       return helixTargets(phase, variant);
     case 'wave':
       return waveTargets(phase, variant);
+    case 'checklist':
+      return checklistTargets(phase, variant);
+    case 'agent-round':
+    case 'agent-tall':
+    case 'agent-long':
+      return agentEyeTargets(phase, variant, shape);
   }
 }
 
@@ -433,6 +569,7 @@ function assignNearest(particles: Particle[], targets: Vec3[]) {
 export class MagneticMorphEngine {
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
+  private detailScale: number;
   private frame = 0;
   private lastTime = 0;
   private options: EngineOptions;
@@ -449,6 +586,7 @@ export class MagneticMorphEngine {
 
     this.canvas = canvas;
     this.context = context;
+    this.detailScale = options.scale;
     this.options = options;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -476,6 +614,7 @@ export class MagneticMorphEngine {
 
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
+    acquirePointerGaze();
     this.resize();
     this.shapeStarted = performance.now() - (options.offset % 1) * options.tempo;
     this.frame = requestAnimationFrame(this.tick);
@@ -484,6 +623,13 @@ export class MagneticMorphEngine {
   destroy() {
     cancelAnimationFrame(this.frame);
     this.resizeObserver.disconnect();
+    releasePointerGaze();
+  }
+
+  setScale(scale: number) {
+    this.detailScale = scale;
+    this.resize();
+    this.draw();
   }
 
   setTheme(theme: MagneticTheme) {
@@ -493,11 +639,12 @@ export class MagneticMorphEngine {
 
   private resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const width = Math.round(40 * dpr);
+    const renderScale = dpr * this.detailScale;
+    const width = Math.round(40 * renderScale);
     if (this.canvas.width === width && this.canvas.height === width) return;
     this.canvas.width = width;
     this.canvas.height = width;
-    this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     this.context.imageSmoothingEnabled = true;
   };
 
@@ -533,7 +680,13 @@ export class MagneticMorphEngine {
     this.lastTime = time;
 
     if (!this.prefersReducedMotion.matches) {
-      if (time - this.shapeStarted >= this.options.tempo) this.beginShape(time);
+      const currentShape = this.options.sequence[this.shapeIndex];
+      const duration = currentShape.startsWith('agent-')
+        ? this.options.tempo * 1.45
+        : currentShape === 'checklist'
+          ? this.options.tempo * 1.15
+          : this.options.tempo;
+      if (time - this.shapeStarted >= duration) this.beginShape(time);
       this.update(time, delta);
     }
     this.draw();

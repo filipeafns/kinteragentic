@@ -28,6 +28,11 @@ type Study = {
 };
 
 type DisplayMode = 'carousel' | 'grid';
+type DetailScale = 1 | 2 | 4;
+
+type ExperienceStyle = CSSProperties & {
+  '--detail-scale': number;
+};
 
 type CarouselStyle = CSSProperties & {
   '--carousel-blur': string;
@@ -41,75 +46,75 @@ const AUTOPLAY_MS = 4200;
 
 const STUDIES: Study[] = [
   {
-    label: 'Magnetic loader morphing through a grid, check, sphere, and cloud',
+    label: 'Magnetic loader morphing through round agent eyes, a grid, check, sphere, and cloud',
     offset: 0,
-    sequence: ['loader', 'grid', 'check', 'sphere', 'cloud'],
+    sequence: ['loader', 'agent-round', 'grid', 'check', 'sphere', 'cloud'],
     tempo: 2320,
   },
   {
-    label: 'Magnetic grid morphing through spreadsheet cells, columns, a cube, and sphere',
+    label: 'Magnetic grid morphing through long agent eyes, spreadsheet cells, a checklist, columns, cube, and sphere',
     offset: 0.08,
-    sequence: ['grid', 'spreadsheet', 'columns', 'cube', 'sphere'],
+    sequence: ['grid', 'agent-long', 'spreadsheet', 'checklist', 'columns', 'cube', 'sphere'],
     tempo: 2460,
   },
   {
-    label: 'Magnetic cube morphing through a pyramid, diamond, sphere, and cloud',
+    label: 'Magnetic cube morphing through tall agent eyes, a pyramid, diamond, sphere, and cloud',
     offset: 0.16,
-    sequence: ['cube', 'pyramid', 'diamond', 'sphere', 'cloud'],
+    sequence: ['cube', 'agent-tall', 'pyramid', 'diamond', 'sphere', 'cloud'],
     tempo: 2240,
   },
   {
-    label: 'Magnetic sphere morphing through a loader, helix, cube, and check',
+    label: 'Magnetic sphere morphing through round agent eyes, a loader, helix, cube, and check',
     offset: 0.24,
-    sequence: ['sphere', 'loader', 'helix', 'cube', 'check'],
+    sequence: ['sphere', 'agent-round', 'loader', 'helix', 'cube', 'check'],
     tempo: 2520,
   },
   {
-    label: 'Magnetic cloud morphing through a wave, sphere, pyramid, and grid',
+    label: 'Magnetic cloud morphing through long agent eyes, a wave, sphere, pyramid, and grid',
     offset: 0.32,
-    sequence: ['cloud', 'wave', 'sphere', 'pyramid', 'grid'],
+    sequence: ['cloud', 'agent-long', 'wave', 'sphere', 'pyramid', 'grid'],
     tempo: 2380,
   },
   {
-    label: 'Magnetic check morphing through a grid, columns, sphere, and loader',
+    label: 'Magnetic check morphing through tall agent eyes, a grid, checklist, columns, sphere, and loader',
     offset: 0.4,
-    sequence: ['check', 'grid', 'columns', 'sphere', 'loader'],
+    sequence: ['check', 'agent-tall', 'grid', 'checklist', 'columns', 'sphere', 'loader'],
     tempo: 2280,
   },
   {
-    label: 'Magnetic spreadsheet morphing through columns, grid, check, and cube',
+    label: 'Magnetic spreadsheet morphing through long agent eyes, a checklist, columns, grid, check, and cube',
     offset: 0.48,
-    sequence: ['spreadsheet', 'columns', 'grid', 'check', 'cube'],
+    sequence: ['spreadsheet', 'agent-long', 'checklist', 'columns', 'grid', 'check', 'cube'],
     tempo: 2420,
   },
   {
-    label: 'Magnetic columns morphing through a spreadsheet, pyramid, wave, and grid',
+    label: 'Magnetic columns morphing through tall agent eyes, a spreadsheet, checklist, pyramid, wave, and grid',
     offset: 0.56,
-    sequence: ['columns', 'spreadsheet', 'pyramid', 'wave', 'grid'],
+    sequence: ['columns', 'agent-tall', 'spreadsheet', 'checklist', 'pyramid', 'wave', 'grid'],
     tempo: 2340,
   },
   {
-    label: 'Magnetic pyramid morphing through a cube, diamond, sphere, and cloud',
+    label: 'Magnetic pyramid morphing through round agent eyes, a cube, diamond, sphere, and cloud',
     offset: 0.64,
-    sequence: ['pyramid', 'cube', 'diamond', 'sphere', 'cloud'],
+    sequence: ['pyramid', 'agent-round', 'cube', 'diamond', 'sphere', 'cloud'],
     tempo: 2500,
   },
   {
-    label: 'Magnetic diamond morphing through a helix, pyramid, cube, and loader',
+    label: 'Magnetic diamond morphing through tall agent eyes, a helix, pyramid, cube, and loader',
     offset: 0.72,
-    sequence: ['diamond', 'helix', 'pyramid', 'cube', 'loader'],
+    sequence: ['diamond', 'agent-tall', 'helix', 'pyramid', 'cube', 'loader'],
     tempo: 2260,
   },
   {
-    label: 'Magnetic helix morphing through a sphere, wave, cloud, and check',
+    label: 'Magnetic helix morphing through long agent eyes, a sphere, wave, cloud, and check',
     offset: 0.8,
-    sequence: ['helix', 'sphere', 'wave', 'cloud', 'check'],
+    sequence: ['helix', 'agent-long', 'sphere', 'wave', 'cloud', 'check'],
     tempo: 2440,
   },
   {
-    label: 'Magnetic wave morphing through a loader, grid, columns, and sphere',
+    label: 'Magnetic wave morphing through round agent eyes, a loader, grid, columns, and sphere',
     offset: 0.88,
-    sequence: ['wave', 'loader', 'grid', 'columns', 'sphere'],
+    sequence: ['wave', 'agent-round', 'loader', 'grid', 'columns', 'sphere'],
     tempo: 2300,
   },
 ];
@@ -121,14 +126,20 @@ function shortestDelta(index: number, selectedIndex: number) {
   return delta;
 }
 
-function carouselStyle(index: number, selectedIndex: number): CarouselStyle {
+function carouselStyle(
+  index: number,
+  selectedIndex: number,
+  detailScale: DetailScale,
+): CarouselStyle {
   const delta = shortestDelta(index, selectedIndex);
   const distance = Math.abs(delta);
   const hidden = distance > 3;
   const opacity = hidden ? 0 : [1, 0.7, 0.24, 0.055][distance];
   const scale = [1.56, 1, 0.78, 0.62][Math.min(distance, 3)];
-  const x = Math.sign(delta) * Math.pow(distance, 0.82) * 154;
-  const y = distance === 0 ? 0 : 68 + Math.pow(distance, 1.58) * 44;
+  const horizontalSpread = 1 + (detailScale - 1) * 0.68;
+  const verticalSpread = 1 + (detailScale - 1) * 0.45;
+  const x = Math.sign(delta) * Math.pow(distance, 0.82) * 154 * horizontalSpread;
+  const y = distance === 0 ? 0 : (68 + Math.pow(distance, 1.58) * 44) * verticalSpread;
 
   return {
     '--carousel-blur': `${distance <= 1 ? 0 : (distance - 1) * 3.5}px`,
@@ -238,7 +249,33 @@ function ExperienceControls({
   );
 }
 
+function DetailControls({
+  onChange,
+  value,
+}: {
+  onChange: (scale: DetailScale) => void;
+  value: DetailScale;
+}) {
+  return (
+    <div className="detail-controls" role="group" aria-label="Particle detail size">
+      {([1, 2, 4] as const).map((scale) => (
+        <button
+          key={scale}
+          type="button"
+          className={value === scale ? 'is-active' : ''}
+          aria-label={`Render particles at ${scale} times size`}
+          aria-pressed={value === scale}
+          onClick={() => onChange(scale)}
+        >
+          {scale}×
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MorphStudy({
+  detailScale,
   displayMode,
   index,
   onPreview,
@@ -248,6 +285,7 @@ function MorphStudy({
   style,
   theme,
 }: {
+  detailScale: DetailScale;
   displayMode: DisplayMode;
   index: number;
   onPreview: () => void;
@@ -259,6 +297,7 @@ function MorphStudy({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<MagneticMorphEngine | null>(null);
+  const initialScale = useRef(detailScale);
   const initialTheme = useRef(theme);
 
   useEffect(() => {
@@ -267,6 +306,7 @@ function MorphStudy({
 
     const engine = new MagneticMorphEngine(canvas, {
       offset: study.offset,
+      scale: initialScale.current,
       sequence: study.sequence,
       tempo: study.tempo,
       theme: initialTheme.current,
@@ -281,6 +321,7 @@ function MorphStudy({
   }, [index, study]);
 
   useEffect(() => engineRef.current?.setTheme(theme), [theme]);
+  useEffect(() => engineRef.current?.setScale(detailScale), [detailScale]);
 
   return (
     <figure
@@ -315,6 +356,7 @@ export function MorphGallery() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('carousel');
   const [selectedIndex, setSelectedIndex] = useState(8);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [detailScale, setDetailScale] = useState<DetailScale>(1);
   const soundMounted = useRef(false);
 
   const selectRelative = useCallback((step: number) => {
@@ -343,9 +385,14 @@ export function MorphGallery() {
   }, [displayMode, selectedIndex, soundEnabled]);
 
   const selectedName = STUDIES[selectedIndex].sequence[0].toUpperCase();
+  const experienceStyle: ExperienceStyle = { '--detail-scale': detailScale };
 
   return (
-    <main className={`morph-experience theme--${theme} view--${displayMode}`}>
+    <main
+      className={`morph-experience theme--${theme} view--${displayMode}`}
+      data-detail-scale={detailScale}
+      style={experienceStyle}
+    >
       <ExperienceControls
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
@@ -379,6 +426,7 @@ export function MorphGallery() {
         {STUDIES.map((study, index) => (
           <MorphStudy
             key={study.label}
+            detailScale={detailScale}
             displayMode={displayMode}
             index={index}
             onPreview={() => {
@@ -390,7 +438,11 @@ export function MorphGallery() {
             }}
             selected={index === selectedIndex}
             study={study}
-            style={displayMode === 'carousel' ? carouselStyle(index, selectedIndex) : undefined}
+            style={
+              displayMode === 'carousel'
+                ? carouselStyle(index, selectedIndex, detailScale)
+                : undefined
+            }
             theme={theme}
           />
         ))}
@@ -401,6 +453,14 @@ export function MorphGallery() {
           </p>
         ) : null}
       </section>
+
+      <DetailControls
+        value={detailScale}
+        onChange={(scale) => {
+          if (scale !== detailScale && soundEnabled) playControlSound('tick', 0.1);
+          setDetailScale(scale);
+        }}
+      />
     </main>
   );
 }

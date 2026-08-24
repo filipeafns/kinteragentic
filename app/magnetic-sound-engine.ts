@@ -67,6 +67,22 @@ const SOUND_SIGNATURES: Record<MagneticShape, SoundSignature> = {
     hover: [layer('tick', 0, 0.13), layer('droplet', 34, 0.1)],
     focus: [layer('droplet', 0, 0.16), layer('whisper', 48, 0.13), layer('chime', 138, 0.1)],
   },
+  checklist: {
+    hover: [layer('tick', 0, 0.15), layer('success', 38, 0.09)],
+    focus: [layer('page', 0, 0.14), layer('tick', 42, 0.17), layer('success', 124, 0.12)],
+  },
+  'agent-round': {
+    hover: [layer('tick', 0, 0.13), layer('bloom', 36, 0.09)],
+    focus: [layer('whisper', 0, 0.14), layer('tick', 44, 0.16), layer('arrival', 132, 0.1)],
+  },
+  'agent-tall': {
+    hover: [layer('tick', 0, 0.14), layer('pulse', 34, 0.09)],
+    focus: [layer('tick', 0, 0.17), layer('pulse', 46, 0.13), layer('chime', 128, 0.1)],
+  },
+  'agent-long': {
+    hover: [layer('tick', 0, 0.13), layer('scan', 36, 0.09)],
+    focus: [layer('whisper', 0, 0.13), layer('scan', 44, 0.14), layer('ready', 132, 0.1)],
+  },
 };
 
 let focusTimers: number[] = [];
