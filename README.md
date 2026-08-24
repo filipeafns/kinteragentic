@@ -6,6 +6,20 @@ The default dark experience uses `#0A0506` with the solid accent `#D9FF2F` and
 adapts the Shipium spatial-wheel mechanic into an autoplaying carousel. A glass
 control switches between dark/light themes and carousel/grid views.
 
+## Layered interaction audio
+
+The site uses `cuelume@0.2.2`. Cuelume contains no recorded audio assets to
+extract: its 17 cues are synthesized at playback time with one shared Web Audio
+context. Each study has a deliberately quiet signature made from two cues on
+mouse hover and three staggered cues when it becomes the selected carousel
+item. `tick` supplies the crisp common transient; shape-specific layers use
+`page`, `scan`, `pulse`, `bloom`, `sparkle`, `whisper`, `droplet`, `ready`, and
+other native Cuelume recipes. The small speaker control disables future cues.
+
+Browsers require a click, tap, or keyboard interaction before audio can start.
+After that first gesture, automatic carousel focus changes also play their
+assigned signatures.
+
 ## Reference behavior extracted from Magnets
 
 The original magnetic system treats every visible source pixel as a physical

@@ -12,6 +12,13 @@ import {
   type MagneticShape,
   type MagneticTheme,
 } from './magnetic-morph-engine';
+import {
+  configureSoundSystem,
+  playControlSound,
+  playFocusSignature,
+  playHoverSignature,
+  stopSoundSequences,
+} from './magnetic-sound-engine';
 
 type Study = {
   label: string;
@@ -158,15 +165,28 @@ function ViewGlyph({ mode }: { mode: DisplayMode }) {
   );
 }
 
+function SoundGlyph({ enabled }: { enabled: boolean }) {
+  return (
+    <span className="sound-glyph" data-enabled={enabled} aria-hidden="true">
+      <span className="sound-glyph__speaker" />
+      <span className="sound-glyph__wave" />
+    </span>
+  );
+}
+
 function ExperienceControls({
   displayMode,
   onDisplayModeChange,
+  onSoundChange,
   onThemeChange,
+  soundEnabled,
   theme,
 }: {
   displayMode: DisplayMode;
   onDisplayModeChange: (mode: DisplayMode) => void;
+  onSoundChange: () => void;
   onThemeChange: () => void;
+  soundEnabled: boolean;
   theme: MagneticTheme;
 }) {
   return (
@@ -185,6 +205,18 @@ function ExperienceControls({
         </button>
         <span className={theme === 'dark' ? 'is-active' : ''}>Dark</span>
       </div>
+
+      <span className="controls-divider" aria-hidden="true" />
+
+      <button
+        type="button"
+        className="sound-toggle"
+        aria-label={soundEnabled ? 'Mute interaction sounds' : 'Enable interaction sounds'}
+        aria-pressed={soundEnabled}
+        onClick={onSoundChange}
+      >
+        <SoundGlyph enabled={soundEnabled} />
+      </button>
 
       <span className="controls-divider" aria-hidden="true" />
 
@@ -209,6 +241,7 @@ function ExperienceControls({
 function MorphStudy({
   displayMode,
   index,
+  onPreview,
   onSelect,
   selected,
   study,
@@ -217,6 +250,7 @@ function MorphStudy({
 }: {
   displayMode: DisplayMode;
   index: number;
+  onPreview: () => void;
   onSelect: () => void;
   selected: boolean;
   study: Study;
@@ -261,6 +295,7 @@ function MorphStudy({
         aria-label={study.label}
         aria-pressed={selected}
         onClick={onSelect}
+        onMouseEnter={onPreview}
       >
         <canvas
           ref={canvasRef}
@@ -279,6 +314,8 @@ export function MorphGallery() {
   const [theme, setTheme] = useState<MagneticTheme>('dark');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('carousel');
   const [selectedIndex, setSelectedIndex] = useState(8);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const soundMounted = useRef(false);
 
   const selectRelative = useCallback((step: number) => {
     setSelectedIndex((current) => (current + step + STUDIES.length) % STUDIES.length);
@@ -290,6 +327,21 @@ export function MorphGallery() {
     return () => window.clearTimeout(autoplay);
   }, [displayMode, selectRelative, selectedIndex, shouldReduceMotion]);
 
+  useEffect(() => {
+    configureSoundSystem(soundEnabled);
+    return stopSoundSequences;
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    if (!soundMounted.current) {
+      soundMounted.current = true;
+      return;
+    }
+    if (displayMode !== 'carousel' || !soundEnabled) return;
+    playFocusSignature(STUDIES[selectedIndex].sequence[0]);
+    return stopSoundSequences;
+  }, [displayMode, selectedIndex, soundEnabled]);
+
   const selectedName = STUDIES[selectedIndex].sequence[0].toUpperCase();
 
   return (
@@ -297,7 +349,14 @@ export function MorphGallery() {
       <ExperienceControls
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
+        onSoundChange={() => {
+          if (soundEnabled) playControlSound('toggle', 0.12);
+          configureSoundSystem(!soundEnabled);
+          if (!soundEnabled) playControlSound('ready', 0.12);
+          setSoundEnabled((current) => !current);
+        }}
         onThemeChange={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))}
+        soundEnabled={soundEnabled}
         theme={theme}
       />
 
@@ -322,6 +381,9 @@ export function MorphGallery() {
             key={study.label}
             displayMode={displayMode}
             index={index}
+            onPreview={() => {
+              if (soundEnabled) playHoverSignature(study.sequence[0]);
+            }}
             onSelect={() => {
               setSelectedIndex(index);
               if (displayMode === 'grid') setDisplayMode('carousel');
