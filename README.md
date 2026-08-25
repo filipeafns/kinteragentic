@@ -1,7 +1,7 @@
 # Magnetic Morph Studies
 
 A single Canvas 2D agent built from one persistent set of particles. The page
-opens in dark mode with two presentation modes:
+opens in light mode with two presentation modes:
 
 - **List** keeps the focused, unified agent at the center.
 - **Grid** opens a spatial autoplay carousel containing the aware face, dizzy
@@ -58,8 +58,12 @@ updates are coalesced into the next animation frame. Decorative carousel
 canvases no longer register global pointer handlers, and control sounds are
 deferred outside the originating event callback to keep UI input responsive.
 
-Dark mode uses `#D9FF2F` on `#0A0506`. Light mode uses pure black on white.
-The optional glow is a faint lime halo. Every card Canvas paints the same solid
+Light mode is the default. The eyes use the selected accent at full strength,
+while the sphere dots blend that accent 72% toward the white Canvas surface.
+Six quick palettes—cobalt, rust, green, mustard, violet, and black—sit beside a
+native full-spectrum picker. Dark mode keeps the same dual-tone logic with a
+shallower 44% background blend for legibility. The optional glow follows the
+selected accent. Every card Canvas paints the same solid
 surface as its container, so there is no inset Canvas square or transparency
 seam.
 

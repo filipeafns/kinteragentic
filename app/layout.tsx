@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://kinteragentic.vercel.app'),
   title: 'Magnetic Morph Studies',
   description:
-    'A cursor-aware 3D particle head morphs between attentive, dizzy, and void-collapse states.',
+    'A dual-tone, cursor-aware 3D particle head morphs between attentive, dizzy, and void-collapse states.',
   openGraph: {
     title: 'Magnetic Morph Studies',
     description: 'A cursor-aware 3D particle head with expressive eyes and size-driven depth.',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'A black spherical particle agent with oval eyes on a white background',
+        alt: 'A spherical particle agent with oval eyes and softly tinted dots on white',
       },
     ],
   },

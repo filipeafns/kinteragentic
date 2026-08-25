@@ -38,6 +38,15 @@ const SEQUENCE_STEPS: ReadonlyArray<{
   { carouselIndex: 2, label: 'Contract', scene: 'collapse' },
 ];
 const AUTOPLAY_MS = 3_000;
+const DEFAULT_ACCENT = '#102A9B';
+const COLOR_PRESETS = [
+  { label: 'Cobalt', value: '#102A9B' },
+  { label: 'Rust', value: '#9E2108' },
+  { label: 'Green', value: '#168D24' },
+  { label: 'Mustard', value: '#9B7300' },
+  { label: 'Violet', value: '#633DE2' },
+  { label: 'Black', value: '#000000' },
+] as const;
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -129,6 +138,7 @@ function GridGlyph() {
 }
 
 function AgentCanvas({
+  accentColor,
   decorative = false,
   detail,
   glowEnabled,
@@ -139,6 +149,7 @@ function AgentCanvas({
   theme,
   variant,
 }: {
+  accentColor: string;
   decorative?: boolean;
   detail: UnifiedAgentDetail;
   glowEnabled: boolean;
@@ -151,6 +162,7 @@ function AgentCanvas({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<UnifiedAgentEngine | null>(null);
+  const initialAccentColor = useRef(accentColor);
   const initialDecorative = useRef(decorative);
   const initialDetail = useRef(detail);
   const initialStepChange = useRef(onSequenceStepChange);
@@ -160,6 +172,7 @@ function AgentCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const engine = new UnifiedAgentEngine(canvas, {
+      accentColor: initialAccentColor.current,
       detail: initialDetail.current,
       interactive: !initialDecorative.current,
       onSequenceStepChange: initialStepChange.current,
@@ -173,6 +186,7 @@ function AgentCanvas({
   }, []);
 
   useEffect(() => engineRef.current?.setDetail(detail), [detail]);
+  useEffect(() => engineRef.current?.setAccentColor(accentColor), [accentColor]);
   useEffect(() => engineRef.current?.setGlow(glowEnabled), [glowEnabled]);
   useEffect(() => engineRef.current?.setTheme(theme), [theme]);
   useEffect(() => engineRef.current?.setVariant(variant), [variant]);
@@ -193,6 +207,7 @@ function AgentCanvas({
 export function UnifiedAgent() {
   const shouldReduceMotion = useReducedMotion();
   const [activeSequenceStep, setActiveSequenceStep] = useState<UnifiedAgentSequenceStep>(0);
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [carouselStep, setCarouselStep] = useState<UnifiedAgentSequenceStep>(0);
   const [detail, setDetail] = useState<UnifiedAgentDetail>(1);
   const [glowEnabled, setGlowEnabled] = useState(false);
@@ -201,7 +216,7 @@ export function UnifiedAgent() {
     step: UnifiedAgentSequenceStep;
   } | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [theme, setTheme] = useState<UnifiedAgentTheme>('dark');
+  const [theme, setTheme] = useState<UnifiedAgentTheme>('light');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const requestId = useRef(0);
   const soundMounted = useRef(false);
@@ -326,6 +341,7 @@ export function UnifiedAgent() {
           style={{ '--agent-size': `${stageSize}px` } as CSSProperties}
         >
           <AgentCanvas
+            accentColor={accentColor}
             detail={detail}
             glowEnabled={glowEnabled}
             label="A rotating particle agent whose dots flow around two solid oval eyes"
@@ -370,6 +386,7 @@ export function UnifiedAgent() {
                 onClick={() => selectCarouselState(index)}
               >
                 <AgentCanvas
+                  accentColor={accentColor}
                   decorative
                   detail={detail}
                   glowEnabled={glowEnabled}
@@ -428,10 +445,48 @@ export function UnifiedAgent() {
             ))}
           </div>
 
+          <div className="color-controls" role="group" aria-label="Agent color">
+            {COLOR_PRESETS.map(({ label, value }) => {
+              const active = accentColor.toUpperCase() === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={active ? 'is-active' : ''}
+                  aria-label={`Use ${label} palette`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    if (!active && soundEnabled) playControlSound('tick', 0.07);
+                    setAccentColor(value);
+                  }}
+                >
+                  <span
+                    className="color-control__swatch"
+                    style={{ '--swatch-color': value } as CSSProperties}
+                    aria-hidden="true"
+                  />
+                </button>
+              );
+            })}
+            <label className="custom-color-control" title="Custom color">
+              <input
+                type="color"
+                value={accentColor}
+                aria-label="Choose custom agent color"
+                onInput={(event) => setAccentColor(event.currentTarget.value.toUpperCase())}
+              />
+              <span
+                className="custom-color-control__swatch"
+                style={{ '--swatch-color': accentColor } as CSSProperties}
+                aria-hidden="true"
+              />
+            </label>
+          </div>
+
           <button
             type="button"
             className={`glow-toggle ${glowEnabled ? 'is-active' : ''}`}
-            aria-label={glowEnabled ? 'Disable faint green glow' : 'Enable faint green glow'}
+            aria-label={glowEnabled ? 'Disable faint accent glow' : 'Enable faint accent glow'}
             aria-pressed={glowEnabled}
             onClick={() => {
               if (soundEnabled) playControlSound('bloom', 0.08);

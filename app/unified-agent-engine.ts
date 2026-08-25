@@ -47,9 +47,9 @@ const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
 const STEP_SCENES: readonly AgentScene[] = ['agent', 'fast', 'agent', 'collapse'];
 
-const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
-  light: { background: '#FFFFFF', particle: '#000000' },
-  dark: { background: '#0A0506', particle: '#D9FF2F' },
+const BACKGROUNDS: Record<UnifiedAgentTheme, string> = {
+  light: '#FFFFFF',
+  dark: '#0A0506',
 };
 
 // Directly mapped from the supplied reference. Coordinates use a 100 × 100 field.
@@ -96,6 +96,31 @@ const hash = (value: number) => {
   const result = Math.sin(value * 91.3458 + 17.234) * 47453.5453;
   return result - Math.floor(result);
 };
+
+function normalizeHex(color: string) {
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : null;
+}
+
+function hexChannels(color: string) {
+  const normalized = normalizeHex(color) ?? '#000000';
+  return {
+    red: Number.parseInt(normalized.slice(1, 3), 16),
+    green: Number.parseInt(normalized.slice(3, 5), 16),
+    blue: Number.parseInt(normalized.slice(5, 7), 16),
+  };
+}
+
+function blendHex(color: string, background: string, amount: number) {
+  const source = hexChannels(color);
+  const destination = hexChannels(background);
+  const channel = (from: number, to: number) => Math.round(mix(from, to, amount));
+  return `rgb(${channel(source.red, destination.red)} ${channel(source.green, destination.green)} ${channel(source.blue, destination.blue)})`;
+}
+
+function hexToRgba(color: string, alpha: number) {
+  const { red, green, blue } = hexChannels(color);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
 
 function blinkAmount(localTime: number) {
   const blinkWindows: Array<[number, number]> = [[2.32, 2.62]];
@@ -370,6 +395,7 @@ function assignNearest(nodes: Node[], targets: Target[]) {
 }
 
 export class UnifiedAgentEngine {
+  private accentColor = '#102A9B';
   private burstStarted = Number.NEGATIVE_INFINITY;
   private burstTimer = 0;
   private canvas: HTMLCanvasElement;
@@ -409,6 +435,7 @@ export class UnifiedAgentEngine {
   constructor(
     canvas: HTMLCanvasElement,
     options: {
+      accentColor?: string;
       detail: UnifiedAgentDetail;
       interactive?: boolean;
       onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
@@ -419,6 +446,7 @@ export class UnifiedAgentEngine {
     if (!context) throw new Error('Canvas 2D is unavailable.');
     this.canvas = canvas;
     this.context = context;
+    this.accentColor = normalizeHex(options.accentColor ?? '') ?? this.accentColor;
     this.interactive = options.interactive ?? true;
     this.onSequenceStepChange = options.onSequenceStepChange;
     this.theme = options.theme;
@@ -474,6 +502,13 @@ export class UnifiedAgentEngine {
 
   setTheme(theme: UnifiedAgentTheme) {
     this.theme = theme;
+    this.draw();
+  }
+
+  setAccentColor(color: string) {
+    const normalized = normalizeHex(color);
+    if (!normalized) return;
+    this.accentColor = normalized;
     this.draw();
   }
 
@@ -740,20 +775,25 @@ export class UnifiedAgentEngine {
 
   private draw() {
     const context = this.context;
-    const colors = COLORS[this.theme];
+    const background = BACKGROUNDS[this.theme];
+    const dimmedColor = blendHex(
+      this.accentColor,
+      background,
+      this.theme === 'light' ? 0.72 : 0.44,
+    );
     context.globalAlpha = this.scene === 'fast' ? 0.19 : 1;
     context.shadowBlur = 0;
-    context.fillStyle = colors.background;
+    context.fillStyle = background;
     context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
-    context.fillStyle = colors.particle;
     if (this.glowEnabled) {
-      context.shadowColor = 'rgba(217, 255, 47, 0.34)';
+      context.shadowColor = hexToRgba(this.accentColor, 0.34);
       context.shadowBlur = 2.7;
     }
 
     const ordered = [...this.nodes].sort((a, b) => a.z - b.z);
     for (const node of ordered) {
       context.globalAlpha = node.alpha;
+      context.fillStyle = node.slot < 2 ? this.accentColor : dimmedColor;
       context.beginPath();
       context.ellipse(
         CENTER + node.x,
