@@ -16,16 +16,16 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://kinteragentic.vercel.app'),
   title: 'Magnetic Morph Studies',
   description:
-    'A unified spherical particle agent rotates, blinks into a globe, and reorganizes into task forms.',
+    'A dual-tone, cursor-aware 3D particle head morphs between attentive, dizzy, and void-collapse states.',
   openGraph: {
     title: 'Magnetic Morph Studies',
-    description: 'A unified spherical particle agent with rotating eyes and size-driven depth.',
+    description: 'A cursor-aware 3D particle head with expressive eyes and size-driven depth.',
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'A black spherical particle agent with oval eyes on a white background',
+        alt: 'A spherical particle agent with oval eyes and softly tinted dots on white',
       },
     ],
   },
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Magnetic Morph Studies',
-    description: 'A unified spherical particle agent with rotating eyes and size-driven depth.',
+    description: 'A cursor-aware 3D particle head with expressive eyes and size-driven depth.',
     images: ['/og.png'],
   },
 };
