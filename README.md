@@ -27,25 +27,36 @@ Horizontal cursor intent also eases the sphere spin through zero and reverses
 its direction. Two moving elliptical exclusion fields bend nearby dots around
 the eyes while leaving the full sphere intact.
 
-Auto is deterministic: `aware → dizzy fast → aware → void collapse → repeat`.
+Auto is deterministic: `Idle → Thinking → Idle → Contract → repeat`. Every
+step lasts three seconds, and the four-step timeline below the agent shows the
+current step by number and name.
 Fast mode rotates the full eyed sphere at roughly seven times normal speed,
 adds short frame persistence, and alternates the two eye closures while the head
 orbits slightly. Collapse captures every node's current position and multiplies
-both axes by the same radial scale. The eye ellipses circularize as all 28 nodes
-converge into a nearly singular core; the following aware state springs back
-out from that point.
+both axes by the same radial scale. A deterministic per-node delay creates the
+sucked-in stagger. The eye ellipses circularize as all 28 nodes converge into a
+nearly singular core, then every node expands back to its captured face position
+before the next Idle step begins.
 
 Pointer proximity repels the circle field. Pointer-down temporarily opens the
 larger simulation field, applies a wide radial impulse, and reconverges through
-a one-second inertial spring without clipping the expanding nodes.
+a one-second inertial spring without clipping the expanding nodes. Once the
+burst returns, it randomly triggers Thinking or Contract, then rejoins the
+four-step sequence through Idle.
 
 ## Presentation and controls
 
 The `1×`, `2×`, and `4×` controls map to 80, 160, and 320 CSS pixels. Each
-Canvas backing buffer follows device density for crisp output. Auto, aware,
-dizzy fast, and void controls directly select the current behavior. In Grid
-mode the same controls navigate the three carousel entries; Auto resumes its
-4.2-second progression. Arrow keys and card selection also move the carousel.
+Canvas backing buffer follows device density for crisp output. The labeled
+`1 Idle`, `2 Thinking`, `3 Idle`, and `4 Contract` timeline both explains the
+sequence and lets a viewer jump to any step without stopping playback. Grid
+mode maps the four-step timeline onto the three unique live-state cards. Arrow
+keys and card selection also move the carousel.
+
+Pointer events only record the latest coordinates; geometry reads and gaze
+updates are coalesced into the next animation frame. Decorative carousel
+canvases no longer register global pointer handlers, and control sounds are
+deferred outside the originating event callback to keep UI input responsive.
 
 Dark mode uses `#D9FF2F` on `#0A0506`. Light mode uses pure black on white.
 The optional glow is a faint lime halo. Every card Canvas paints the same solid

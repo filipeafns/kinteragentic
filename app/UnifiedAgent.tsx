@@ -12,6 +12,7 @@ import {
 import {
   type UnifiedAgentDetail,
   UnifiedAgentEngine,
+  type UnifiedAgentSequenceStep,
   type UnifiedAgentTheme,
   type UnifiedAgentVariant,
 } from './unified-agent-engine';
@@ -25,9 +26,18 @@ type CarouselStyle = CSSProperties & {
   '--carousel-y': string;
 };
 
-const VARIANTS: UnifiedAgentVariant[] = ['auto', 'agent', 'fast', 'collapse'];
 const CAROUSEL_STATES: AgentSoundState[] = ['agent', 'fast', 'collapse'];
-const AUTOPLAY_MS = 4_200;
+const SEQUENCE_STEPS: ReadonlyArray<{
+  carouselIndex: number;
+  label: string;
+  scene: AgentSoundState;
+}> = [
+  { carouselIndex: 0, label: 'Idle', scene: 'agent' },
+  { carouselIndex: 1, label: 'Thinking', scene: 'fast' },
+  { carouselIndex: 0, label: 'Idle', scene: 'agent' },
+  { carouselIndex: 2, label: 'Contract', scene: 'collapse' },
+];
+const AUTOPLAY_MS = 3_000;
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(false);
@@ -118,23 +128,14 @@ function GridGlyph() {
   );
 }
 
-function VariantGlyph({ variant }: { variant: UnifiedAgentVariant }) {
-  const count = variant === 'agent' ? 2 : variant === 'auto' ? 1 : 3;
-  return (
-    <span className={`variant-glyph variant-glyph--${variant}`} aria-hidden="true">
-      {Array.from({ length: count }, (_, index) => (
-        <span key={index} />
-      ))}
-    </span>
-  );
-}
-
 function AgentCanvas({
   decorative = false,
   detail,
   glowEnabled,
   label,
+  onSequenceStepChange,
   onPointerEnter,
+  requestedStep,
   theme,
   variant,
 }: {
@@ -142,13 +143,17 @@ function AgentCanvas({
   detail: UnifiedAgentDetail;
   glowEnabled: boolean;
   label: string;
+  onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
   onPointerEnter: () => void;
+  requestedStep?: { id: number; step: UnifiedAgentSequenceStep } | null;
   theme: UnifiedAgentTheme;
   variant: UnifiedAgentVariant;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<UnifiedAgentEngine | null>(null);
+  const initialDecorative = useRef(decorative);
   const initialDetail = useRef(detail);
+  const initialStepChange = useRef(onSequenceStepChange);
   const initialTheme = useRef(theme);
 
   useEffect(() => {
@@ -156,6 +161,8 @@ function AgentCanvas({
     if (!canvas) return;
     const engine = new UnifiedAgentEngine(canvas, {
       detail: initialDetail.current,
+      interactive: !initialDecorative.current,
+      onSequenceStepChange: initialStepChange.current,
       theme: initialTheme.current,
     });
     engineRef.current = engine;
@@ -169,6 +176,9 @@ function AgentCanvas({
   useEffect(() => engineRef.current?.setGlow(glowEnabled), [glowEnabled]);
   useEffect(() => engineRef.current?.setTheme(theme), [theme]);
   useEffect(() => engineRef.current?.setVariant(variant), [variant]);
+  useEffect(() => {
+    if (requestedStep) engineRef.current?.playSequenceStep(requestedStep.step);
+  }, [requestedStep]);
 
   return (
     <canvas
@@ -182,20 +192,27 @@ function AgentCanvas({
 
 export function UnifiedAgent() {
   const shouldReduceMotion = useReducedMotion();
-  const [carouselAuto, setCarouselAuto] = useState(true);
+  const [activeSequenceStep, setActiveSequenceStep] = useState<UnifiedAgentSequenceStep>(0);
+  const [carouselStep, setCarouselStep] = useState<UnifiedAgentSequenceStep>(0);
   const [detail, setDetail] = useState<UnifiedAgentDetail>(1);
   const [glowEnabled, setGlowEnabled] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [requestedStep, setRequestedStep] = useState<{
+    id: number;
+    step: UnifiedAgentSequenceStep;
+  } | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [theme, setTheme] = useState<UnifiedAgentTheme>('dark');
-  const [variant, setVariant] = useState<UnifiedAgentVariant>('auto');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const requestId = useRef(0);
   const soundMounted = useRef(false);
   const stageSize = detail * 80;
+  const selectedIndex = SEQUENCE_STEPS[carouselStep].carouselIndex;
 
   const selectRelative = useCallback((step: number) => {
-    setSelectedIndex(
-      (current) => (current + step + CAROUSEL_STATES.length) % CAROUSEL_STATES.length,
+    setCarouselStep(
+      (current) =>
+        ((current + step + SEQUENCE_STEPS.length) %
+          SEQUENCE_STEPS.length) as UnifiedAgentSequenceStep,
     );
   }, []);
 
@@ -205,10 +222,10 @@ export function UnifiedAgent() {
   }, [soundEnabled]);
 
   useEffect(() => {
-    if (viewMode !== 'grid' || !carouselAuto || shouldReduceMotion) return;
+    if (viewMode !== 'grid' || shouldReduceMotion) return;
     const autoplay = window.setTimeout(() => selectRelative(1), AUTOPLAY_MS);
     return () => window.clearTimeout(autoplay);
-  }, [carouselAuto, selectedIndex, selectRelative, shouldReduceMotion, viewMode]);
+  }, [carouselStep, selectRelative, shouldReduceMotion, viewMode]);
 
   useEffect(() => {
     if (!soundMounted.current) {
@@ -218,12 +235,21 @@ export function UnifiedAgent() {
     if (viewMode !== 'grid' || !soundEnabled) return;
     playFocusSignature(CAROUSEL_STATES[selectedIndex]);
     return stopSoundSequences;
-  }, [selectedIndex, soundEnabled, viewMode]);
+  }, [carouselStep, selectedIndex, soundEnabled, viewMode]);
 
-  const selectCarouselState = (index: number, manual = true) => {
+  const selectCarouselState = (index: number) => {
     if (index !== selectedIndex && soundEnabled) playControlSound('page', 0.08);
-    setSelectedIndex(index);
-    if (manual) setCarouselAuto(false);
+    setCarouselStep((index === 0 ? 0 : index === 1 ? 1 : 3) as UnifiedAgentSequenceStep);
+  };
+
+  const selectSequenceStep = (step: UnifiedAgentSequenceStep) => {
+    if (soundEnabled) playControlSound('page', 0.08);
+    if (viewMode === 'grid') {
+      setCarouselStep(step);
+      return;
+    }
+    requestId.current += 1;
+    setRequestedStep({ id: requestId.current, step });
   };
 
   return (
@@ -256,7 +282,6 @@ export function UnifiedAgent() {
           aria-pressed={soundEnabled}
           onClick={() => {
             if (soundEnabled) playControlSound('toggle', 0.1);
-            configureSoundSystem(!soundEnabled);
             if (!soundEnabled) playControlSound('ready', 0.1);
             setSoundEnabled((current) => !current);
           }}
@@ -304,11 +329,13 @@ export function UnifiedAgent() {
             detail={detail}
             glowEnabled={glowEnabled}
             label="A rotating particle agent whose dots flow around two solid oval eyes"
+            onSequenceStepChange={setActiveSequenceStep}
             onPointerEnter={() => {
               if (soundEnabled) playHoverSignature('agent');
             }}
+            requestedStep={requestedStep}
             theme={theme}
-            variant={variant}
+            variant="auto"
           />
         </section>
       ) : (
@@ -320,12 +347,10 @@ export function UnifiedAgent() {
           onKeyDown={(event) => {
             if (event.key === 'ArrowLeft') {
               event.preventDefault();
-              setCarouselAuto(false);
               selectRelative(-1);
             }
             if (event.key === 'ArrowRight') {
               event.preventDefault();
-              setCarouselAuto(false);
               selectRelative(1);
             }
           }}
@@ -362,72 +387,60 @@ export function UnifiedAgent() {
       )}
 
       <div className="agent-bottom-controls">
-        <div className="variant-controls" role="group" aria-label="Agent variant">
-          {VARIANTS.map((value) => {
-            const stateIndex = value === 'auto' ? -1 : CAROUSEL_STATES.indexOf(value);
-            const active =
-              viewMode === 'list'
-                ? variant === value
-                : value === 'auto'
-                  ? carouselAuto
-                  : !carouselAuto && stateIndex === selectedIndex;
+        <div className="sequence-controls" role="group" aria-label="Animation sequence">
+          {SEQUENCE_STEPS.map(({ label }, index) => {
+            const step = index as UnifiedAgentSequenceStep;
+            const active = (viewMode === 'list' ? activeSequenceStep : carouselStep) === step;
             return (
               <button
-                key={value}
+                key={`${index}-${label}`}
                 type="button"
                 className={active ? 'is-active' : ''}
-                aria-label={`${value === 'agent' ? 'Aware face' : value === 'fast' ? 'Dizzy fast' : value === 'collapse' ? 'Void collapse' : 'Auto sequence'} variant`}
+                aria-label={`${index + 1}. ${label}`}
                 aria-pressed={active}
-                onClick={() => {
-                  if (viewMode === 'list') {
-                    if (value !== variant && soundEnabled) playControlSound('page', 0.08);
-                    setVariant(value);
-                    return;
-                  }
-                  if (value === 'auto') {
-                    if (!carouselAuto && soundEnabled) playControlSound('ready', 0.08);
-                    setCarouselAuto(true);
-                    return;
-                  }
-                  selectCarouselState(stateIndex);
-                }}
+                onClick={() => selectSequenceStep(step)}
               >
-                <VariantGlyph variant={value} />
+                <span className="sequence-step__number" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="sequence-step__label">{label}</span>
               </button>
             );
           })}
         </div>
 
-        <div className="detail-controls" role="group" aria-label="Agent display size">
-          {([1, 2, 4] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              className={detail === value ? 'is-active' : ''}
-              aria-label={`Display agent at ${value * 80} pixels`}
-              aria-pressed={detail === value}
-              onClick={() => {
-                if (value !== detail && soundEnabled) playControlSound('tick', 0.09);
-                setDetail(value);
-              }}
-            >
-              {value}×
-            </button>
-          ))}
-        </div>
+        <div className="agent-utility-controls">
+          <div className="detail-controls" role="group" aria-label="Agent display size">
+            {([1, 2, 4] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={detail === value ? 'is-active' : ''}
+                aria-label={`Display agent at ${value * 80} pixels`}
+                aria-pressed={detail === value}
+                onClick={() => {
+                  if (value !== detail && soundEnabled) playControlSound('tick', 0.09);
+                  setDetail(value);
+                }}
+              >
+                {value}×
+              </button>
+            ))}
+          </div>
 
-        <button
-          type="button"
-          className={`glow-toggle ${glowEnabled ? 'is-active' : ''}`}
-          aria-label={glowEnabled ? 'Disable faint green glow' : 'Enable faint green glow'}
-          aria-pressed={glowEnabled}
-          onClick={() => {
-            if (soundEnabled) playControlSound('bloom', 0.08);
-            setGlowEnabled((current) => !current);
-          }}
-        >
-          <span aria-hidden="true" />
-        </button>
+          <button
+            type="button"
+            className={`glow-toggle ${glowEnabled ? 'is-active' : ''}`}
+            aria-label={glowEnabled ? 'Disable faint green glow' : 'Enable faint green glow'}
+            aria-pressed={glowEnabled}
+            onClick={() => {
+              if (soundEnabled) playControlSound('bloom', 0.08);
+              setGlowEnabled((current) => !current);
+            }}
+          >
+            <span aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </main>
   );

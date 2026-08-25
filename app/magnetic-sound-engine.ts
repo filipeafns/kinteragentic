@@ -56,7 +56,7 @@ export function configureSoundSystem(enabled: boolean) {
 }
 
 export function playControlSound(cue: SoundName, volume = 0.14) {
-  play(cue, { volume });
+  window.setTimeout(() => play(cue, { volume }), 0);
 }
 
 export function playFocusSignature(state: AgentSoundState) {

@@ -3,6 +3,7 @@ export type UnifiedAgentDetail = 1 | 2 | 4;
 
 type AgentScene = 'agent' | 'fast' | 'collapse';
 export type UnifiedAgentVariant = 'auto' | AgentScene;
+export type UnifiedAgentSequenceStep = 0 | 1 | 2 | 3;
 
 type Target = {
   alpha: number;
@@ -39,13 +40,12 @@ const LOGICAL_SIZE = 180;
 const CENTER = LOGICAL_SIZE / 2;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const FACE_DURATION = 6_800;
-const FAST_DURATION = 3_200;
-const COLLAPSE_DURATION = 1_650;
+const STEP_DURATION = 3_000;
 const FACE_SPHERE_RADIUS = 42;
 const BURST_DURATION = 1_000;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
+const STEP_SCENES: readonly AgentScene[] = ['agent', 'fast', 'agent', 'collapse'];
 
 const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
   light: { background: '#FFFFFF', particle: '#000000' },
@@ -98,10 +98,7 @@ const hash = (value: number) => {
 };
 
 function blinkAmount(localTime: number) {
-  const blinkWindows: Array<[number, number]> = [
-    [2.15, 2.5],
-    [5.62, 5.98],
-  ];
+  const blinkWindows: Array<[number, number]> = [[2.32, 2.62]];
   for (const [start, end] of blinkWindows) {
     if (localTime >= start && localTime <= end) {
       return Math.sin(((localTime - start) / (end - start)) * Math.PI);
@@ -111,8 +108,8 @@ function blinkAmount(localTime: number) {
 }
 
 function expressionAmount(localTime: number) {
-  const start = 3.8;
-  const end = 5.15;
+  const start = 1.25;
+  const end = 1.95;
   if (localTime < start || localTime > end) return 0;
   return Math.sin(((localTime - start) / (end - start)) * Math.PI);
 }
@@ -310,7 +307,11 @@ function referenceAgentTargets(
 }
 
 function collapseTarget(node: Node, localTime: number): Target {
-  const collapse = ease(localTime / 0.58);
+  const inwardDelay = node.seed * 0.42;
+  const inward = ease((localTime - inwardDelay) / 0.72);
+  const outwardDelay = 1.42 + node.seed * 0.24;
+  const outward = ease((localTime - outwardDelay) / 0.92);
+  const collapse = inward * (1 - outward);
   const radialScale = mix(1, 0.006, collapse);
   const coreAngle = node.seed * TAU;
   const coreRadius = mix(0, 0.16 + node.seed * 0.16, collapse);
@@ -383,27 +384,43 @@ export class UnifiedAgentEngine {
     targetY: 0,
   };
   private glowEnabled = false;
+  private interactive: boolean;
   private lastTime = 0;
   private manualScene: AgentScene | null = null;
-  private nextAutoScene: Exclude<AgentScene, 'agent'> = 'fast';
   private nodes: Node[];
+  private onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
+  private pendingPointer = {
+    clientX: 0,
+    clientY: 0,
+    dirty: false,
+    pointerType: 'mouse',
+  };
   private prefersReducedMotion: MediaQueryList;
+  private reactionTimer = 0;
   private repel = { strength: 0, targetStrength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
   private scene: AgentScene = 'agent';
   private sceneStarted = performance.now();
+  private sequenceStep: UnifiedAgentSequenceStep = 0;
   private spherePhase = 0;
   private spinDrive = 0.42;
   private theme: UnifiedAgentTheme;
 
   constructor(
     canvas: HTMLCanvasElement,
-    options: { detail: UnifiedAgentDetail; theme: UnifiedAgentTheme },
+    options: {
+      detail: UnifiedAgentDetail;
+      interactive?: boolean;
+      onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
+      theme: UnifiedAgentTheme;
+    },
   ) {
     const context = canvas.getContext('2d', { alpha: false });
     if (!context) throw new Error('Canvas 2D is unavailable.');
     this.canvas = canvas;
     this.context = context;
+    this.interactive = options.interactive ?? true;
+    this.onSequenceStepChange = options.onSequenceStepChange;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const firstTargets = referenceAgentTargets(0, 0, 0, 0, 0, 0);
@@ -425,10 +442,12 @@ export class UnifiedAgentEngine {
     }));
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
-    canvas.addEventListener('pointerdown', this.triggerBurst, { passive: true });
-    window.addEventListener('pointermove', this.updatePointer, { passive: true });
-    window.addEventListener('pointercancel', this.releaseRepel);
-    window.addEventListener('blur', this.releaseRepel);
+    if (this.interactive) {
+      canvas.addEventListener('pointerdown', this.triggerBurst, { passive: true });
+      window.addEventListener('pointermove', this.updatePointer, { passive: true });
+      window.addEventListener('pointercancel', this.releaseRepel);
+      window.addEventListener('blur', this.releaseRepel);
+    }
     this.resize();
     this.frame = requestAnimationFrame(this.tick);
   }
@@ -436,12 +455,15 @@ export class UnifiedAgentEngine {
   destroy() {
     cancelAnimationFrame(this.frame);
     window.clearTimeout(this.burstTimer);
+    window.clearTimeout(this.reactionTimer);
     this.canvas.removeAttribute('data-bursting');
     this.resizeObserver.disconnect();
-    this.canvas.removeEventListener('pointerdown', this.triggerBurst);
-    window.removeEventListener('pointermove', this.updatePointer);
-    window.removeEventListener('pointercancel', this.releaseRepel);
-    window.removeEventListener('blur', this.releaseRepel);
+    if (this.interactive) {
+      this.canvas.removeEventListener('pointerdown', this.triggerBurst);
+      window.removeEventListener('pointermove', this.updatePointer);
+      window.removeEventListener('pointercancel', this.releaseRepel);
+      window.removeEventListener('blur', this.releaseRepel);
+    }
   }
 
   setDetail(detail: UnifiedAgentDetail) {
@@ -463,12 +485,16 @@ export class UnifiedAgentEngine {
   setVariant(variant: UnifiedAgentVariant) {
     if (variant === 'auto') {
       this.manualScene = null;
-      this.nextAutoScene = 'fast';
-      this.transitionTo('agent', performance.now());
+      this.transitionToStep(0, performance.now());
       return;
     }
     this.manualScene = variant;
     this.transitionTo(variant, performance.now());
+  }
+
+  playSequenceStep(step: UnifiedAgentSequenceStep) {
+    this.manualScene = null;
+    this.transitionToStep(step, performance.now());
   }
 
   private resize = () => {
@@ -484,26 +510,36 @@ export class UnifiedAgentEngine {
   };
 
   private updatePointer = (event: PointerEvent) => {
+    this.pendingPointer.clientX = event.clientX;
+    this.pendingPointer.clientY = event.clientY;
+    this.pendingPointer.pointerType = event.pointerType;
+    this.pendingPointer.dirty = true;
+  };
+
+  private flushPointer() {
+    if (!this.pendingPointer.dirty) return;
+    this.pendingPointer.dirty = false;
     const bounds = this.canvas.getBoundingClientRect();
     if (!bounds.width || !bounds.height) return;
     const centerX = bounds.left + bounds.width * 0.5;
     const centerY = bounds.top + bounds.height * 0.5;
     const gazeRange = Math.max(90, bounds.width * 1.25);
-    this.gaze.targetX = clamp((event.clientX - centerX) / gazeRange, -1, 1);
-    this.gaze.targetY = clamp((event.clientY - centerY) / gazeRange, -1, 1);
+    const { clientX, clientY, pointerType } = this.pendingPointer;
+    this.gaze.targetX = clamp((clientX - centerX) / gazeRange, -1, 1);
+    this.gaze.targetY = clamp((clientY - centerY) / gazeRange, -1, 1);
 
-    if (event.pointerType === 'touch') {
+    if (pointerType === 'touch') {
       this.repel.targetStrength = 0;
       return;
     }
-    const outsideX = Math.max(bounds.left - event.clientX, 0, event.clientX - bounds.right);
-    const outsideY = Math.max(bounds.top - event.clientY, 0, event.clientY - bounds.bottom);
+    const outsideX = Math.max(bounds.left - clientX, 0, clientX - bounds.right);
+    const outsideY = Math.max(bounds.top - clientY, 0, clientY - bounds.bottom);
     const distance = Math.hypot(outsideX, outsideY);
     const approachRadius = Math.max(72, bounds.width * 0.48);
-    this.repel.x = clamp(((event.clientX - bounds.left) / bounds.width) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
-    this.repel.y = clamp(((event.clientY - bounds.top) / bounds.height) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
+    this.repel.x = clamp(((clientX - bounds.left) / bounds.width) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
+    this.repel.y = clamp(((clientY - bounds.top) / bounds.height) * LOGICAL_SIZE, 0, LOGICAL_SIZE);
     this.repel.targetStrength = clamp(1 - distance / approachRadius, 0, 1);
-  };
+  }
 
   private releaseRepel = () => {
     this.repel.targetStrength = 0;
@@ -538,6 +574,12 @@ export class UnifiedAgentEngine {
       node.velocityY += (directionY / distance) * impulse + (directionX / distance) * tangent;
       node.velocityZ += (node.seed - 0.5) * 54;
     }
+
+    window.clearTimeout(this.reactionTimer);
+    this.reactionTimer = window.setTimeout(() => {
+      const reactionStep: UnifiedAgentSequenceStep = Math.random() < 0.5 ? 1 : 3;
+      this.playSequenceStep(reactionStep);
+    }, BURST_DURATION * 0.9);
   };
 
   private transitionTo(scene: AgentScene, time: number) {
@@ -572,28 +614,27 @@ export class UnifiedAgentEngine {
     }
   }
 
+  private transitionToStep(step: UnifiedAgentSequenceStep, time: number) {
+    this.sequenceStep = step;
+    this.onSequenceStepChange?.(step);
+    this.transitionTo(STEP_SCENES[step], time);
+  }
+
   private beginScene(time: number) {
-    if (this.scene === 'agent') {
-      const nextScene = this.nextAutoScene;
-      this.nextAutoScene = nextScene === 'fast' ? 'collapse' : 'fast';
-      this.transitionTo(nextScene, time);
-      return;
-    }
-    this.transitionTo('agent', time);
+    const nextStep = ((this.sequenceStep + 1) % STEP_SCENES.length) as UnifiedAgentSequenceStep;
+    this.transitionToStep(nextStep, time);
   }
 
   private tick = (time: number) => {
     const delta = this.lastTime ? Math.min(1 / 30, (time - this.lastTime) / 1000) : 0;
     this.lastTime = time;
     const elapsed = time - this.sceneStarted;
-    const duration =
-      this.scene === 'agent'
-        ? FACE_DURATION
-        : this.scene === 'fast'
-          ? FAST_DURATION
-          : COLLAPSE_DURATION;
     if (!this.prefersReducedMotion.matches) {
-      if (this.manualScene === null && elapsed >= duration) this.beginScene(time);
+      this.flushPointer();
+      if (elapsed >= STEP_DURATION) {
+        if (this.manualScene === null) this.beginScene(time);
+        else if (this.manualScene === 'collapse') this.transitionTo('collapse', time);
+      }
       this.update(time, delta);
     }
     this.draw();
