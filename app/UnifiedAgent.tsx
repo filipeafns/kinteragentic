@@ -25,25 +25,8 @@ type CarouselStyle = CSSProperties & {
   '--carousel-y': string;
 };
 
-const VARIANTS: UnifiedAgentVariant[] = [
-  'auto',
-  'agent',
-  'fast',
-  'trail',
-  'cube',
-  'collapse',
-  'bars',
-  'globe',
-];
-const CAROUSEL_STATES: AgentSoundState[] = [
-  'agent',
-  'fast',
-  'trail',
-  'cube',
-  'collapse',
-  'bars',
-  'globe',
-];
+const VARIANTS: UnifiedAgentVariant[] = ['auto', 'agent', 'fast', 'collapse'];
+const CAROUSEL_STATES: AgentSoundState[] = ['agent', 'fast', 'collapse'];
 const AUTOPLAY_MS = 4_200;
 
 function useReducedMotion() {
@@ -136,14 +119,7 @@ function GridGlyph() {
 }
 
 function VariantGlyph({ variant }: { variant: UnifiedAgentVariant }) {
-  const count =
-    variant === 'agent'
-      ? 2
-      : variant === 'fast' || variant === 'trail' || variant === 'collapse'
-        ? 3
-        : variant === 'bars'
-          ? 4
-          : 1;
+  const count = variant === 'agent' ? 2 : variant === 'auto' ? 1 : 3;
   return (
     <span className={`variant-glyph variant-glyph--${variant}`} aria-hidden="true">
       {Array.from({ length: count }, (_, index) => (
@@ -364,7 +340,7 @@ export function UnifiedAgent() {
               <button
                 type="button"
                 className="agent-carousel__button"
-                aria-label={`Select ${state === 'agent' ? 'face' : state} state`}
+                aria-label={`Select ${state === 'agent' ? 'aware face' : state === 'fast' ? 'dizzy fast' : 'void collapse'} state`}
                 aria-pressed={index === selectedIndex}
                 onClick={() => selectCarouselState(index)}
               >
@@ -400,7 +376,7 @@ export function UnifiedAgent() {
                 key={value}
                 type="button"
                 className={active ? 'is-active' : ''}
-                aria-label={`${value === 'agent' ? 'Face' : value} variant`}
+                aria-label={`${value === 'agent' ? 'Aware face' : value === 'fast' ? 'Dizzy fast' : value === 'collapse' ? 'Void collapse' : 'Auto sequence'} variant`}
                 aria-pressed={active}
                 onClick={() => {
                   if (viewMode === 'list') {

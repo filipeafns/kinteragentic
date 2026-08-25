@@ -532,8 +532,7 @@ canvas {
   border-radius: 50%;
 }
 
-.variant-glyph--auto > span,
-.variant-glyph--globe > span {
+.variant-glyph--auto > span {
   width: 3px;
   height: 3px;
   border-radius: 50%;
@@ -557,22 +556,6 @@ canvas {
   background: currentColor;
 }
 
-.variant-glyph--globe {
-  border: 1px solid currentColor;
-  border-radius: 50%;
-}
-
-.variant-glyph--cube {
-  width: 9px;
-  height: 9px;
-  border: 1px solid currentColor;
-  transform: rotate(45deg);
-}
-
-.variant-glyph--cube > span {
-  display: none;
-}
-
 .variant-glyph--fast {
   flex-direction: column;
   align-items: flex-end;
@@ -591,28 +574,6 @@ canvas {
 
 .variant-glyph--fast > span:nth-child(3) {
   width: 4px;
-}
-
-.variant-glyph--trail > span {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.variant-glyph--trail > span:nth-child(1) {
-  left: 0;
-  bottom: 1px;
-}
-
-.variant-glyph--trail > span:nth-child(2) {
-  top: 1px;
-}
-
-.variant-glyph--trail > span:nth-child(3) {
-  right: 0;
-  bottom: 3px;
 }
 
 .variant-glyph--collapse > span {
@@ -637,33 +598,6 @@ canvas {
   width: 12px;
   height: 12px;
   opacity: 0.54;
-}
-
-.variant-glyph--bars {
-  align-items: center;
-  gap: 1px;
-}
-
-.variant-glyph--bars > span {
-  width: 1.5px;
-  border-radius: 99px;
-  background: currentColor;
-}
-
-.variant-glyph--bars > span:nth-child(1) {
-  height: 5px;
-}
-
-.variant-glyph--bars > span:nth-child(2) {
-  height: 10px;
-}
-
-.variant-glyph--bars > span:nth-child(3) {
-  height: 7px;
-}
-
-.variant-glyph--bars > span:nth-child(4) {
-  height: 4px;
 }
 
 .detail-controls {

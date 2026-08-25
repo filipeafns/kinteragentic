@@ -1,7 +1,7 @@
 export type UnifiedAgentTheme = 'light' | 'dark';
 export type UnifiedAgentDetail = 1 | 2 | 4;
 
-type AgentScene = 'agent' | 'fast' | 'trail' | 'cube' | 'collapse' | 'bars' | 'globe';
+type AgentScene = 'agent' | 'fast' | 'collapse';
 export type UnifiedAgentVariant = 'auto' | AgentScene;
 
 type Target = {
@@ -29,26 +29,23 @@ type Node = Target & {
   velocityZ: number;
 };
 
+type Point3 = {
+  x: number;
+  y: number;
+  z: number;
+};
+
 const LOGICAL_SIZE = 180;
 const CENTER = LOGICAL_SIZE / 2;
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const NODE_COUNT = 28;
-const FACE_DURATION = 11_500;
-const SHAPE_DURATION = 3_900;
+const FACE_DURATION = 6_800;
+const FAST_DURATION = 3_200;
+const COLLAPSE_DURATION = 1_650;
 const FACE_SPHERE_RADIUS = 42;
-const EYE_ARRIVAL_DURATION = 1_100;
-const FAST_SPEED = 7;
-const COLLAPSE_CYCLE = 2.35;
 const BURST_DURATION = 1_000;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
-const TRAIL_HEAD_COUNT = 7;
-const TRAIL_SAMPLES = NODE_COUNT / TRAIL_HEAD_COUNT;
-const TRAIL_GLOBE_HOLD = 0.68;
-const TRAIL_REVEAL_DURATION = 0.58;
-const TRAIL_SAMPLE_DELAY = 0.115;
-const RANDOM_SHAPES: AgentScene[] = ['fast', 'trail', 'cube', 'collapse', 'bars', 'globe'];
 
 const COLORS: Record<UnifiedAgentTheme, { background: string; particle: string }> = {
   light: { background: '#FFFFFF', particle: '#000000' },
@@ -95,18 +92,6 @@ const ease = (value: number) => {
   return normalized * normalized * (3 - 2 * normalized);
 };
 
-function mixTarget(from: Target, to: Target, amount: number): Target {
-  return {
-    alpha: mix(from.alpha, to.alpha, amount),
-    angle: mix(from.angle ?? 0, to.angle ?? 0, amount),
-    radiusX: mix(from.radiusX, to.radiusX, amount),
-    radiusY: mix(from.radiusY, to.radiusY, amount),
-    x: mix(from.x, to.x, amount),
-    y: mix(from.y, to.y, amount),
-    z: mix(from.z, to.z, amount),
-  };
-}
-
 const hash = (value: number) => {
   const result = Math.sin(value * 91.3458 + 17.234) * 47453.5453;
   return result - Math.floor(result);
@@ -114,8 +99,8 @@ const hash = (value: number) => {
 
 function blinkAmount(localTime: number) {
   const blinkWindows: Array<[number, number]> = [
-    [2.7, 3.2],
-    [9.7, 10.2],
+    [2.15, 2.5],
+    [5.62, 5.98],
   ];
   for (const [start, end] of blinkWindows) {
     if (localTime >= start && localTime <= end) {
@@ -126,43 +111,105 @@ function blinkAmount(localTime: number) {
 }
 
 function expressionAmount(localTime: number) {
-  const start = 6.2;
-  const end = 7.9;
+  const start = 3.8;
+  const end = 5.15;
   if (localTime < start || localTime > end) return 0;
   return Math.sin(((localTime - start) / (end - start)) * Math.PI);
 }
 
-function eyeTargets(localTime: number, gazeX: number, gazeY: number, thinking = false): Target[] {
-  const blink = blinkAmount(localTime);
-  const expression = expressionAmount(localTime);
-  const arrival = ease(localTime / (EYE_ARRIVAL_DURATION * 0.001));
-  const headTilt = gazeX * 0.28;
-  const fastEnvelope = thinking ? ease(localTime / 0.55) : 0;
-  const fastPhase = localTime * FAST_SPEED * 0.94;
-  const fastX = Math.sin(fastPhase) * 6.2 * fastEnvelope;
-  const fastY = Math.cos(fastPhase * 1.17) * 3.4 * fastEnvelope;
-  const fastTilt = Math.sin(fastPhase * 0.73) * 0.2 * fastEnvelope;
-  const cosine = Math.cos(headTilt + fastTilt);
-  const sine = Math.sin(headTilt + fastTilt);
+function rotatePoint(point: Point3, yaw: number, pitch: number, roll: number): Point3 {
+  const yawCosine = Math.cos(yaw);
+  const yawSine = Math.sin(yaw);
+  const yawX = point.x * yawCosine + point.z * yawSine;
+  const yawZ = -point.x * yawSine + point.z * yawCosine;
+
+  const pitchCosine = Math.cos(pitch);
+  const pitchSine = Math.sin(pitch);
+  const pitchY = point.y * pitchCosine - yawZ * pitchSine;
+  const pitchZ = point.y * pitchSine + yawZ * pitchCosine;
+
+  const rollCosine = Math.cos(roll);
+  const rollSine = Math.sin(roll);
+  return {
+    x: yawX * rollCosine - pitchY * rollSine,
+    y: yawX * rollSine + pitchY * rollCosine,
+    z: pitchZ,
+  };
+}
+
+function headPose(localTime: number, headX: number, headY: number, dizzy: boolean) {
+  const dizzyEnvelope = dizzy ? ease(localTime / 0.42) : 0;
+  const dizzyPhase = localTime * 7.4;
+  return {
+    dizzyEnvelope,
+    dizzyPhase,
+    pitch:
+      -headY * 0.39 +
+      Math.cos(dizzyPhase * 0.83) * 0.13 * dizzyEnvelope,
+    roll:
+      headX * 0.13 -
+      headX * headY * 0.1 +
+      Math.sin(dizzyPhase * 0.71) * 0.16 * dizzyEnvelope,
+    yaw:
+      headX * 0.5 +
+      Math.sin(dizzyPhase * 0.91) * 0.18 * dizzyEnvelope,
+  };
+}
+
+function eyeTargets(
+  localTime: number,
+  eyeX: number,
+  eyeY: number,
+  headX: number,
+  headY: number,
+  dizzy: boolean,
+): Target[] {
+  const blink = dizzy ? 0 : blinkAmount(localTime);
+  const expression = dizzy ? 0 : expressionAmount(localTime);
+  const pose = headPose(localTime, headX, headY, dizzy);
+  const residualX = eyeX - headX;
+  const residualY = eyeY - headY;
 
   return [-12.2, 12.2].map((offset, index): Target => {
-    const expressiveClosure = index === 0 ? expression * 0.12 : expression * 0.54;
-    const thinkingClosure = thinking ? (index === 0 ? 0.26 : 0.66) : 0;
-    const closure = Math.max(blink, expressiveClosure, thinkingClosure);
-    const localX = offset * arrival;
+    const transformed = rotatePoint(
+      {
+        x:
+          offset +
+          Math.sin(pose.dizzyPhase + index * 0.32) * 3.4 * pose.dizzyEnvelope,
+        y:
+          -1 +
+          Math.cos(pose.dizzyPhase * 1.13 + index * 0.46) * 2.7 * pose.dizzyEnvelope,
+        z: 20,
+      },
+      pose.yaw,
+      pose.pitch,
+      pose.roll,
+    );
+    const depth = clamp((transformed.z + 24) / 48, 0, 1);
+    const perspective = 1 + transformed.z / 330;
+    const expressiveClosure = index === 0 ? expression * 0.1 : expression * 0.56;
+    const dizzyClosure = dizzy
+      ? 0.25 + (Math.sin(pose.dizzyPhase + index * Math.PI) + 1) * 0.27
+      : 0;
+    const closure = Math.max(blink, expressiveClosure, dizzyClosure);
+    const foreshortening =
+      1 - Math.abs(pose.yaw) * (index === (pose.yaw > 0 ? 0 : 1) ? 0.5 : 0.13);
+
     return {
       alpha: 1,
-      angle: headTilt + fastTilt,
-      radiusX: mix(1.4, 5.05, arrival),
-      radiusY: mix(1.4, mix(12.35, 2.8, closure), arrival),
-      x: localX * cosine + gazeX * 2.2 + fastX,
+      angle: pose.roll + Math.sin(pose.dizzyPhase + index) * 0.08 * pose.dizzyEnvelope,
+      radiusX: 5.05 * foreshortening * mix(0.86, 1.11, depth),
+      radiusY: mix(12.35, 2.65, closure) * mix(0.9, 1.08, depth),
+      x:
+        transformed.x * perspective +
+        eyeX * 1.9 +
+        residualX * 4.6,
       y:
-        -1 +
-        localX * sine +
-        gazeY * 1.8 +
-        Math.sin(localTime * 0.76) * 0.35 +
-        fastY,
-      z: FACE_SPHERE_RADIUS + 4,
+        transformed.y * perspective +
+        eyeY * 1.65 +
+        residualY * 4 +
+        Math.sin(localTime * 0.76) * 0.28,
+      z: transformed.z + FACE_SPHERE_RADIUS * 0.48,
     };
   });
 }
@@ -196,14 +243,17 @@ function avoidEyes(target: Target, eyes: Target[], index: number, protection: nu
   return { ...target, x, y };
 }
 
-function fullSphereTargets(localTime: number, eyes: Target[], speed = 1): Target[] {
-  const motionTime = localTime * speed;
-  const rotation = motionTime * 0.78;
-  const cosine = Math.cos(rotation);
-  const sine = Math.sin(rotation);
-  const tilt = 0.24 + Math.sin(motionTime * 0.31) * 0.08;
-  const tiltCosine = Math.cos(tilt);
-  const tiltSine = Math.sin(tilt);
+function fullSphereTargets(
+  localTime: number,
+  eyes: Target[],
+  spherePhase: number,
+  headX: number,
+  headY: number,
+  dizzy: boolean,
+): Target[] {
+  const pose = headPose(localTime, headX, headY, dizzy);
+  const phaseCosine = Math.cos(spherePhase);
+  const phaseSine = Math.sin(spherePhase);
   const protection = clamp((eyes[0].radiusX - 1.4) / (5.05 - 1.4), 0, 1);
 
   return REFERENCE_RING.map(([, , mappedRadius], index): Target => {
@@ -213,15 +263,18 @@ function fullSphereTargets(localTime: number, eyes: Target[], speed = 1): Target
     const baseX = Math.cos(angle) * ringRadius * FACE_SPHERE_RADIUS;
     const baseY = normalizedY * FACE_SPHERE_RADIUS;
     const baseZ = Math.sin(angle) * ringRadius * FACE_SPHERE_RADIUS;
-    const rotatedX = baseX * cosine + baseZ * sine;
-    const rotatedZ = -baseX * sine + baseZ * cosine;
-    const rotatedY = baseY * tiltCosine - rotatedZ * tiltSine;
-    const tiltedZ = baseY * tiltSine + rotatedZ * tiltCosine;
-    const depth = clamp((tiltedZ / FACE_SPHERE_RADIUS + 1) * 0.5, 0, 1);
-    const perspective = 1 + (tiltedZ / FACE_SPHERE_RADIUS) * 0.075;
-    const wobble = Math.sin(motionTime * (1.18 + (index % 4) * 0.08) + index * 1.91);
-    const x = (rotatedX + wobble * 0.7) * perspective;
-    const y = (rotatedY + wobble * 0.9) * perspective;
+    const spun = {
+      x: baseX * phaseCosine + baseZ * phaseSine,
+      y: baseY,
+      z: -baseX * phaseSine + baseZ * phaseCosine,
+    };
+    const transformed = rotatePoint(spun, pose.yaw, pose.pitch + 0.2, pose.roll);
+    const depth = clamp((transformed.z / FACE_SPHERE_RADIUS + 1) * 0.5, 0, 1);
+    const perspective = 1 + (transformed.z / FACE_SPHERE_RADIUS) * 0.075;
+    const wobbleSpeed = dizzy ? 5.2 : 1.18;
+    const wobble = Math.sin(localTime * (wobbleSpeed + (index % 4) * 0.08) + index * 1.91);
+    const x = (transformed.x + wobble * 0.7) * perspective;
+    const y = (transformed.y + wobble * 0.9) * perspective;
     const edge = clamp(Math.hypot(x, y) / FACE_SPHERE_RADIUS, 0, 1);
     const radius = mappedRadius * (0.56 + edge * 0.46) * (0.9 + depth * 0.1);
 
@@ -232,7 +285,7 @@ function fullSphereTargets(localTime: number, eyes: Target[], speed = 1): Target
         radiusY: radius,
         x,
         y,
-        z: tiltedZ,
+        z: transformed.z,
       },
       eyes,
       index,
@@ -243,221 +296,54 @@ function fullSphereTargets(localTime: number, eyes: Target[], speed = 1): Target
 
 function referenceAgentTargets(
   localTime: number,
-  gazeX: number,
-  gazeY: number,
-  speed = 1,
-  thinking = false,
-  arrived = false,
+  eyeX: number,
+  eyeY: number,
+  headX: number,
+  headY: number,
+  spherePhase: number,
+  dizzy = false,
 ): Target[] {
-  const eyeTime = localTime + (arrived ? EYE_ARRIVAL_DURATION * 0.001 : 0);
-  const eyes = eyeTargets(eyeTime, gazeX, gazeY, thinking);
-  const ring = fullSphereTargets(localTime, eyes, speed);
+  const eyes = eyeTargets(localTime, eyeX, eyeY, headX, headY, dizzy);
+  const ring = fullSphereTargets(localTime, eyes, spherePhase, headX, headY, dizzy);
 
   return [...eyes, ...ring];
 }
 
-function globePoint(index: number, phase: number, radius = 34): Target {
-  const normalizedY = 1 - (index / Math.max(1, NODE_COUNT - 1)) * 2;
-  const ringRadius = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY));
-  const angle = index * GOLDEN_ANGLE + phase;
-  const x3d = Math.cos(angle) * ringRadius * radius;
-  const y3d = normalizedY * radius;
-  const z3d = Math.sin(angle) * ringRadius * radius;
-  const perspective = 1 + (z3d / radius) * 0.07;
-  const x = x3d * perspective;
-  const y = y3d * perspective;
-  const edge = clamp(Math.hypot(x, y) / radius, 0, 1);
-  const depth = clamp((z3d / radius + 1) * 0.5, 0, 1);
-  const nodeRadius = 1.05 + Math.pow(edge, 1.5) * 2.5;
+function collapseTarget(node: Node, localTime: number): Target {
+  const collapse = ease(localTime / 0.58);
+  const radialScale = mix(1, 0.006, collapse);
+  const coreAngle = node.seed * TAU;
+  const coreRadius = mix(0, 0.16 + node.seed * 0.16, collapse);
+  const circleRadius = 0.72 + node.seed * 0.28;
   return {
-    alpha: 0.3 + depth * 0.7,
-    radiusX: nodeRadius,
-    radiusY: nodeRadius,
-    x,
-    y,
-    z: z3d,
+    alpha: mix(node.hold.alpha, 1, collapse),
+    angle: mix(node.hold.angle ?? 0, 0, collapse),
+    radiusX: mix(node.hold.radiusX, circleRadius, collapse),
+    radiusY: mix(node.hold.radiusY, circleRadius, collapse),
+    x: node.hold.x * radialScale + Math.cos(coreAngle) * coreRadius,
+    y: node.hold.y * radialScale + Math.sin(coreAngle) * coreRadius,
+    z: node.hold.z * radialScale,
   };
-}
-
-function globeTargets(absoluteTime: number, scale: number): Target[] {
-  return Array.from({ length: NODE_COUNT }, (_, index) => {
-    const target = globePoint(index, absoluteTime * 0.5);
-    const scaledRadius = target.radiusX * mix(0.72, 1, scale);
-    return {
-      ...target,
-      radiusX: scaledRadius,
-      radiusY: scaledRadius,
-      x: target.x * scale,
-      y: target.y * scale,
-      z: target.z * scale,
-    };
-  });
-}
-
-function trailWavePoint(leader: number, history: number, absoluteTime: number): Target {
-  const sampleTime = absoluteTime - history * TRAIL_SAMPLE_DELAY;
-  const leaderPhase = (leader / TRAIL_HEAD_COUNT) * TAU;
-  const chase = Math.sin(sampleTime * 3.7 + leaderPhase * 1.45) * 0.13;
-  const longitude = sampleTime * 2.4 + leaderPhase + chase;
-  const latitude = Math.sin(longitude * 2 + sampleTime * 0.58) * 0.38;
-  const radius = 34;
-  const latitudeCosine = Math.cos(latitude);
-  const x3d = Math.cos(longitude) * latitudeCosine * radius;
-  const y3d = Math.sin(latitude) * radius * 0.94;
-  const z3d = Math.sin(longitude) * latitudeCosine * radius;
-  const tilt = 0.34 + Math.sin(sampleTime * 0.47) * 0.06;
-  const tiltCosine = Math.cos(tilt);
-  const tiltSine = Math.sin(tilt);
-  const rotatedY = y3d * tiltCosine - z3d * tiltSine;
-  const rotatedZ = y3d * tiltSine + z3d * tiltCosine;
-  const perspective = 1 + (rotatedZ / radius) * 0.08;
-  const x = x3d * perspective;
-  const y = rotatedY * perspective;
-  const edge = clamp(Math.hypot(x, y) / radius, 0, 1);
-  const depth = clamp((rotatedZ / radius + 1) * 0.5, 0, 1);
-  const historyScale = [1, 0.48, 0.26, 0.14][history] ?? 0.14;
-  const nodeRadius = (1.15 + edge * 1.85) * historyScale;
-
-  return {
-    alpha: 0.3 + depth * 0.7,
-    radiusX: nodeRadius,
-    radiusY: nodeRadius,
-    x,
-    y,
-    z: rotatedZ,
-  };
-}
-
-function trailTargets(absoluteTime: number, localTime: number): Target[] {
-  const globe = globeTargets(absoluteTime, 1);
-  if (localTime <= TRAIL_GLOBE_HOLD) return globe;
-
-  const wave = Array.from({ length: NODE_COUNT }, (_, index) => {
-    const leader = Math.floor(index / TRAIL_SAMPLES);
-    const history = index % TRAIL_SAMPLES;
-    return trailWavePoint(leader, history, absoluteTime);
-  });
-  const reveal = ease((localTime - TRAIL_GLOBE_HOLD) / TRAIL_REVEAL_DURATION);
-  return wave.map((target, index) => mixTarget(globe[index], target, reveal));
-}
-
-function cubeTargets(absoluteTime: number): Target[] {
-  const rotationY = absoluteTime * 0.58;
-  const rotationX = 0.48 + Math.sin(absoluteTime * 0.32) * 0.12;
-  const cosineY = Math.cos(rotationY);
-  const sineY = Math.sin(rotationY);
-  const cosineX = Math.cos(rotationX);
-  const sineX = Math.sin(rotationX);
-
-  return Array.from({ length: NODE_COUNT }, (_, index) => {
-    const normalizedY = 1 - ((index + 0.5) / NODE_COUNT) * 2;
-    const radial = Math.sqrt(Math.max(0, 1 - normalizedY * normalizedY));
-    const angle = index * GOLDEN_ANGLE;
-    const directionX = Math.cos(angle) * radial;
-    const directionY = normalizedY;
-    const directionZ = Math.sin(angle) * radial;
-    const cubeProjection = 24 / Math.max(Math.abs(directionX), Math.abs(directionY), Math.abs(directionZ));
-    const x3d = directionX * cubeProjection;
-    const y3d = directionY * cubeProjection;
-    const z3d = directionZ * cubeProjection;
-    const rotatedX = x3d * cosineY + z3d * sineY;
-    const rotatedZ = -x3d * sineY + z3d * cosineY;
-    const rotatedY = y3d * cosineX - rotatedZ * sineX;
-    const tiltedZ = y3d * sineX + rotatedZ * cosineX;
-    const depth = clamp((tiltedZ / 42 + 1) * 0.5, 0, 1);
-    const perspective = 1 + tiltedZ / 230;
-    const projectedX = rotatedX * perspective;
-    const projectedY = rotatedY * perspective;
-    const nodeRadius = 1.1 + clamp(Math.hypot(projectedX, projectedY) / 40, 0, 1) * 1.6;
-    return {
-      alpha: 0.38 + depth * 0.62,
-      radiusX: nodeRadius,
-      radiusY: nodeRadius,
-      x: projectedX,
-      y: projectedY,
-      z: tiltedZ,
-    };
-  });
-}
-
-function collapseTargets(absoluteTime: number, localTime: number): Target[] {
-  const phase = localTime % COLLAPSE_CYCLE;
-  let collapse = 0;
-  if (phase < 0.34) {
-    collapse = ease(phase / 0.34);
-  } else if (phase < 0.58) {
-    collapse = 1;
-  } else if (phase < 1.08) {
-    collapse = 1 - ease((phase - 0.58) / 0.5);
-  }
-
-  const scale = mix(1, 0.025, collapse);
-  const spin = absoluteTime * mix(0.7, 7.8, collapse);
-  return Array.from({ length: NODE_COUNT }, (_, index) => {
-    const target = globePoint(index, spin, 34);
-    const coreAngle = index * GOLDEN_ANGLE + absoluteTime * 9.4;
-    const coreRadius = (0.18 + hash(index * 7.9) * 0.92) * collapse;
-    const x = target.x * scale + Math.cos(coreAngle) * coreRadius;
-    const y = target.y * scale + Math.sin(coreAngle) * coreRadius;
-    const nodeRadius = mix(target.radiusX, 1.05 + hash(index * 3.2) * 0.42, collapse);
-    return {
-      alpha: mix(target.alpha, 0.82 + hash(index * 4.1) * 0.18, collapse),
-      radiusX: nodeRadius,
-      radiusY: nodeRadius,
-      x,
-      y,
-      z: target.z * scale,
-    };
-  });
-}
-
-function barTargets(absoluteTime: number): Target[] {
-  const columnCount = 7;
-  const nodesPerColumn = NODE_COUNT / columnCount;
-  return Array.from({ length: NODE_COUNT }, (_, index) => {
-    const column = Math.floor(index / nodesPerColumn);
-    const row = index % nodesPerColumn;
-    const columnPhase = absoluteTime * 4.4 + column * 0.88;
-    const trackingY =
-      Math.sin(columnPhase) * 10.5 + Math.sin(columnPhase * 0.53 + column * 1.7) * 3.4;
-    const pulse = (Math.sin(columnPhase * 1.17 + row * 0.62) + 1) * 0.5;
-    const x = (column - (columnCount - 1) * 0.5) * 8.2;
-    const y = (row - (nodesPerColumn - 1) * 0.5) * 7.2 + trackingY;
-    const nodeRadius = 1.45 + pulse * 0.72;
-    return {
-      alpha: 0.72 + pulse * 0.28,
-      radiusX: nodeRadius,
-      radiusY: nodeRadius,
-      x,
-      y,
-      z: Math.sin(columnPhase + row * 0.8) * 8,
-    };
-  });
 }
 
 function targetsFor(
-  scene: AgentScene,
-  absoluteTime: number,
+  scene: Exclude<AgentScene, 'collapse'>,
   localTime: number,
-  gazeX: number,
-  gazeY: number,
+  eyeX: number,
+  eyeY: number,
+  headX: number,
+  headY: number,
+  spherePhase: number,
 ): Target[] {
-  switch (scene) {
-    case 'agent':
-      return referenceAgentTargets(localTime, gazeX, gazeY);
-    case 'globe':
-      return globeTargets(absoluteTime, 1);
-    case 'cube':
-      return cubeTargets(absoluteTime);
-    case 'fast':
-      return referenceAgentTargets(localTime, gazeX, gazeY, FAST_SPEED, true, true);
-    case 'trail':
-      return trailTargets(absoluteTime, localTime);
-    case 'collapse':
-      return collapseTargets(absoluteTime, localTime);
-    case 'bars':
-      return barTargets(absoluteTime);
-  }
+  return referenceAgentTargets(
+    localTime,
+    eyeX,
+    eyeY,
+    headX,
+    headY,
+    spherePhase,
+    scene === 'fast',
+  );
 }
 
 function assignNearest(nodes: Node[], targets: Target[]) {
@@ -488,18 +374,26 @@ export class UnifiedAgentEngine {
   private canvas: HTMLCanvasElement;
   private context: CanvasRenderingContext2D;
   private frame = 0;
-  private gaze = { targetX: 0, targetY: 0, x: 0, y: 0 };
+  private gaze = {
+    eyeX: 0,
+    eyeY: 0,
+    headX: 0,
+    headY: 0,
+    targetX: 0,
+    targetY: 0,
+  };
   private glowEnabled = false;
-  private lastShape: AgentScene = 'globe';
   private lastTime = 0;
   private manualScene: AgentScene | null = null;
+  private nextAutoScene: Exclude<AgentScene, 'agent'> = 'fast';
   private nodes: Node[];
   private prefersReducedMotion: MediaQueryList;
   private repel = { strength: 0, targetStrength: 0, x: CENTER, y: CENTER };
   private resizeObserver: ResizeObserver;
   private scene: AgentScene = 'agent';
-  private sceneLocalTime = 0;
-  private sceneStarted = performance.now() - EYE_ARRIVAL_DURATION;
+  private sceneStarted = performance.now();
+  private spherePhase = 0;
+  private spinDrive = 0.42;
   private theme: UnifiedAgentTheme;
 
   constructor(
@@ -512,7 +406,7 @@ export class UnifiedAgentEngine {
     this.context = context;
     this.theme = options.theme;
     this.prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const firstTargets = referenceAgentTargets(EYE_ARRIVAL_DURATION * 0.001, 0, 0);
+    const firstTargets = referenceAgentTargets(0, 0, 0, 0, 0, 0);
     this.nodes = firstTargets.map((target, index) => ({
       ...target,
       activation: 0,
@@ -569,7 +463,8 @@ export class UnifiedAgentEngine {
   setVariant(variant: UnifiedAgentVariant) {
     if (variant === 'auto') {
       this.manualScene = null;
-      if (this.scene !== 'agent') this.transitionTo('agent', performance.now());
+      this.nextAutoScene = 'fast';
+      this.transitionTo('agent', performance.now());
       return;
     }
     this.manualScene = variant;
@@ -646,12 +541,25 @@ export class UnifiedAgentEngine {
   };
 
   private transitionTo(scene: AgentScene, time: number) {
+    const previousScene = this.scene;
     this.scene = scene;
     this.sceneStarted = time;
-    const targets = targetsFor(scene, time * 0.001, 0, this.gaze.x, this.gaze.y);
-    assignNearest(this.nodes, targets);
+    if (scene !== 'collapse') {
+      const targets = targetsFor(
+        scene,
+        0,
+        this.gaze.eyeX,
+        this.gaze.eyeY,
+        this.gaze.headX,
+        this.gaze.headY,
+        this.spherePhase,
+      );
+      assignNearest(this.nodes, targets);
+    }
+    const activationSpread =
+      scene === 'collapse' || previousScene === 'collapse' ? 18 : 92;
     for (const node of this.nodes) {
-      node.activation = time + Math.pow(node.seed, 1.7) * 130;
+      node.activation = time + Math.pow(node.seed, 1.7) * activationSpread;
       node.hold = {
         alpha: node.alpha,
         angle: node.angle ?? 0,
@@ -665,22 +573,25 @@ export class UnifiedAgentEngine {
   }
 
   private beginScene(time: number) {
-    let nextScene: AgentScene;
     if (this.scene === 'agent') {
-      const candidates = RANDOM_SHAPES.filter((scene) => scene !== this.lastShape);
-      nextScene = candidates[Math.floor(Math.random() * candidates.length)] ?? 'globe';
-      this.lastShape = nextScene;
-    } else {
-      nextScene = 'agent';
+      const nextScene = this.nextAutoScene;
+      this.nextAutoScene = nextScene === 'fast' ? 'collapse' : 'fast';
+      this.transitionTo(nextScene, time);
+      return;
     }
-    this.transitionTo(nextScene, time);
+    this.transitionTo('agent', time);
   }
 
   private tick = (time: number) => {
     const delta = this.lastTime ? Math.min(1 / 30, (time - this.lastTime) / 1000) : 0;
     this.lastTime = time;
     const elapsed = time - this.sceneStarted;
-    const duration = this.scene === 'agent' ? FACE_DURATION : SHAPE_DURATION;
+    const duration =
+      this.scene === 'agent'
+        ? FACE_DURATION
+        : this.scene === 'fast'
+          ? FAST_DURATION
+          : COLLAPSE_DURATION;
     if (!this.prefersReducedMotion.matches) {
       if (this.manualScene === null && elapsed >= duration) this.beginScene(time);
       this.update(time, delta);
@@ -692,29 +603,49 @@ export class UnifiedAgentEngine {
   private update(time: number, delta: number) {
     const elapsed = time - this.sceneStarted;
     const localTime = elapsed * 0.001;
-    this.sceneLocalTime = localTime;
-    this.gaze.x += (this.gaze.targetX - this.gaze.x) * (1 - Math.exp(-5.2 * delta));
-    this.gaze.y += (this.gaze.targetY - this.gaze.y) * (1 - Math.exp(-4.2 * delta));
+    this.gaze.eyeX +=
+      (this.gaze.targetX - this.gaze.eyeX) * (1 - Math.exp(-10.2 * delta));
+    this.gaze.eyeY +=
+      (this.gaze.targetY - this.gaze.eyeY) * (1 - Math.exp(-8.8 * delta));
+    this.gaze.headX +=
+      (this.gaze.targetX - this.gaze.headX) * (1 - Math.exp(-3.15 * delta));
+    this.gaze.headY +=
+      (this.gaze.targetY - this.gaze.headY) * (1 - Math.exp(-2.75 * delta));
+
+    const requestedSpin =
+      Math.abs(this.gaze.targetX) < 0.08 ? 0.42 : Math.sign(this.gaze.targetX);
+    this.spinDrive += (requestedSpin - this.spinDrive) * (1 - Math.exp(-2.7 * delta));
+    const spinDirection = Math.sign(this.spinDrive) || 1;
+    const spinMagnitude = 0.64 + Math.abs(this.spinDrive) * 0.48;
+    const spinSpeed = this.scene === 'fast' ? 6.4 : 0.86;
+    if (this.scene !== 'collapse') {
+      this.spherePhase += delta * spinSpeed * spinDirection * spinMagnitude;
+    }
+
     this.repel.strength +=
       (this.repel.targetStrength - this.repel.strength) * (1 - Math.exp(-10 * delta));
-    const targets = targetsFor(
-      this.scene,
-      time * 0.001,
-      localTime,
-      this.gaze.x,
-      this.gaze.y,
-    );
+    const targets =
+      this.scene === 'collapse'
+        ? null
+        : targetsFor(
+            this.scene,
+            localTime,
+            this.gaze.eyeX,
+            this.gaze.eyeY,
+            this.gaze.headX,
+            this.gaze.headY,
+            this.spherePhase,
+          );
 
     for (const node of this.nodes) {
-      const target = targets[node.slot];
+      const target =
+        this.scene === 'collapse' ? collapseTarget(node, localTime) : targets![node.slot];
       const destination = time >= node.activation ? target : node.hold;
       const burstElapsed = time - this.burstStarted;
       const burstActive = burstElapsed >= 0 && burstElapsed < BURST_DURATION;
       const burstReturn = burstActive ? ease(burstElapsed / BURST_DURATION) : 1;
-      const sceneStiffness =
-        this.scene === 'collapse' ? 188 : this.scene === 'trail' ? 126 : this.scene === 'bars' ? 112 : 76;
-      const restingDamping =
-        this.scene === 'collapse' ? 19 : this.scene === 'trail' ? 16.4 : this.scene === 'bars' ? 16 : 13.4;
+      const sceneStiffness = this.scene === 'collapse' ? 188 : this.scene === 'fast' ? 104 : 78;
+      const restingDamping = this.scene === 'collapse' ? 19 : this.scene === 'fast' ? 15.2 : 13.6;
       const stiffness =
         ((sceneStiffness + node.seed * 14) / node.mass) * mix(0.045, 1, burstReturn);
       const dampingRate = burstActive ? mix(5.4, restingDamping, burstReturn) : restingDamping;
@@ -724,7 +655,7 @@ export class UnifiedAgentEngine {
       node.velocityZ += (destination.z - node.z) * stiffness * delta;
 
       const isEye = (this.scene === 'agent' || this.scene === 'fast') && node.slot < 2;
-      if (!isEye && this.repel.strength > 0.001) {
+      if (!isEye && this.scene !== 'collapse' && this.repel.strength > 0.001) {
         let repelX = CENTER + node.x - this.repel.x;
         let repelY = CENTER + node.y - this.repel.y;
         let distance = Math.hypot(repelX, repelY);
@@ -769,7 +700,7 @@ export class UnifiedAgentEngine {
   private draw() {
     const context = this.context;
     const colors = COLORS[this.theme];
-    context.globalAlpha = this.scene === 'fast' ? 0.19 : this.scene === 'collapse' ? 0.34 : 1;
+    context.globalAlpha = this.scene === 'fast' ? 0.19 : 1;
     context.shadowBlur = 0;
     context.fillStyle = colors.background;
     context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
@@ -778,8 +709,6 @@ export class UnifiedAgentEngine {
       context.shadowColor = 'rgba(217, 255, 47, 0.34)';
       context.shadowBlur = 2.7;
     }
-
-    if (this.scene === 'trail') this.drawTrailPaths(colors.particle);
 
     const ordered = [...this.nodes].sort((a, b) => a.z - b.z);
     for (const node of ordered) {
@@ -798,35 +727,5 @@ export class UnifiedAgentEngine {
     }
     context.globalAlpha = 1;
     context.shadowBlur = 0;
-  }
-
-  private drawTrailPaths(color: string) {
-    const reveal = ease((this.sceneLocalTime - TRAIL_GLOBE_HOLD) / TRAIL_REVEAL_DURATION);
-    const burstElapsed = performance.now() - this.burstStarted;
-    if (reveal <= 0 || (burstElapsed >= 0 && burstElapsed < BURST_DURATION)) return;
-
-    const context = this.context;
-    const nodesBySlot = new Map(this.nodes.map((node) => [node.slot, node]));
-    context.save();
-    context.strokeStyle = color;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-
-    for (let leader = 0; leader < TRAIL_HEAD_COUNT; leader += 1) {
-      for (let history = TRAIL_SAMPLES - 1; history >= 1; history -= 1) {
-        const older = nodesBySlot.get(leader * TRAIL_SAMPLES + history);
-        const newer = nodesBySlot.get(leader * TRAIL_SAMPLES + history - 1);
-        if (!older || !newer) continue;
-        const progress = (TRAIL_SAMPLES - history) / (TRAIL_SAMPLES - 1);
-        context.globalAlpha = reveal * mix(0.16, 0.56, progress) * Math.min(older.alpha, newer.alpha);
-        context.lineWidth = mix(0.42, 0.9, progress);
-        context.beginPath();
-        context.moveTo(CENTER + older.x, CENTER + older.y);
-        context.lineTo(CENTER + newer.x, CENTER + newer.y);
-        context.stroke();
-      }
-    }
-
-    context.restore();
   }
 }

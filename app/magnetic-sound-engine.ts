@@ -1,6 +1,6 @@
 import { play, setEnabled, setVolume, type SoundName } from 'cuelume';
 
-export type AgentSoundState = 'agent' | 'fast' | 'trail' | 'cube' | 'collapse' | 'bars' | 'globe';
+export type AgentSoundState = 'agent' | 'fast' | 'collapse';
 
 type SoundLayer = {
   cue: SoundName;
@@ -24,29 +24,13 @@ const SOUND_SIGNATURES: Record<AgentSoundState, SoundSignature> = {
     hover: [layer('tick', 0, 0.14), layer('pulse', 34, 0.09)],
     focus: [layer('tick', 0, 0.17), layer('pulse', 46, 0.13), layer('chime', 128, 0.1)],
   },
-  globe: {
-    hover: [layer('tick', 0, 0.14), layer('bloom', 34, 0.1)],
-    focus: [layer('bloom', 0, 0.17), layer('tick', 48, 0.16), layer('sparkle', 138, 0.11)],
-  },
-  cube: {
-    hover: [layer('tick', 0, 0.16), layer('page', 42, 0.1)],
-    focus: [layer('page', 0, 0.17), layer('tick', 48, 0.18), layer('ready', 132, 0.12)],
-  },
   fast: {
     hover: [layer('tick', 0, 0.15), layer('scan', 28, 0.1)],
     focus: [layer('scan', 0, 0.17), layer('tick', 36, 0.16), layer('pulse', 104, 0.12)],
   },
-  trail: {
-    hover: [layer('tick', 0, 0.14), layer('whisper', 30, 0.1)],
-    focus: [layer('scan', 0, 0.15), layer('whisper', 42, 0.14), layer('sparkle', 126, 0.1)],
-  },
   collapse: {
     hover: [layer('tick', 0, 0.14), layer('release', 28, 0.1)],
     focus: [layer('release', 0, 0.17), layer('pulse', 38, 0.15), layer('bloom', 112, 0.11)],
-  },
-  bars: {
-    hover: [layer('tick', 0, 0.14), layer('scan', 30, 0.1)],
-    focus: [layer('scan', 0, 0.16), layer('tick', 42, 0.17), layer('loading', 118, 0.11)],
   },
 };
 
