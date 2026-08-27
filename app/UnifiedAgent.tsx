@@ -139,29 +139,10 @@ function GridGlyph() {
   );
 }
 
-function RecordGlyph({ recording }: { recording: boolean }) {
-  return <span className="capture-glyph capture-glyph--record" data-recording={recording} aria-hidden="true" />;
-}
-
-function SnapshotGlyph() {
-  return (
-    <svg className="capture-glyph" viewBox="0 0 18 18" aria-hidden="true">
-      <rect x="2.25" y="3.25" width="13.5" height="11.5" rx="2" />
-      <circle cx="11.8" cy="6.8" r="1.15" />
-      <path d="M3.7 12.9 7.2 9.5l2.1 2 1.4-1.25 3.6 2.65" />
-    </svg>
-  );
-}
-
-function VectorGlyph() {
-  return (
-    <svg className="capture-glyph" viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M4 13.5C4.6 7.2 8.1 4.5 14 4.5M4 13.5c4.2.4 7.4-1 10-4.1" />
-      <circle cx="4" cy="13.5" r="1.45" />
-      <circle cx="14" cy="4.5" r="1.45" />
-      <circle cx="14" cy="9.4" r="1.45" />
-    </svg>
-  );
+function formatRecordingTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
 function AgentCanvas({
@@ -473,93 +454,95 @@ export function UnifiedAgent() {
         </section>
       )}
 
-      <div className="agent-bottom-controls">
-        <div className="sequence-controls" role="group" aria-label="Animation sequence">
-          {SEQUENCE_STEPS.map(({ label }, index) => {
-            const step = index as UnifiedAgentSequenceStep;
-            const active = (viewMode === 'list' ? activeSequenceStep : carouselStep) === step;
-            return (
-              <button
-                key={`${index}-${label}`}
-                type="button"
-                className={active ? 'is-active' : ''}
-                aria-label={`${index + 1}. ${label}`}
-                aria-pressed={active}
-                onClick={() => selectSequenceStep(step)}
-              >
-                <span className="sequence-step__number" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <span className="sequence-step__label">{label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <span className="bottom-controls-divider" aria-hidden="true" />
-
-        <div className="agent-utility-controls">
-          <div className="detail-controls" role="group" aria-label="Agent display size">
-            {([1, 2, 4] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={detail === value ? 'is-active' : ''}
-                disabled={captureBusy || recording}
-                aria-label={`Display agent at ${value * 80} pixels`}
-                aria-pressed={detail === value}
-                onClick={() => {
-                  if (value !== detail && soundEnabled) playControlSound('tick', 0.09);
-                  setDetail(value);
-                }}
-              >
-                {value}×
-              </button>
-            ))}
-          </div>
-
-          <span className="bottom-controls-divider" aria-hidden="true" />
-
-          <div className="color-controls" role="group" aria-label="Agent field color">
-            {COLOR_PRESETS.map(({ label, value }) => {
-              const active = accentColor.toUpperCase() === value;
+      <div className="agent-bottom-dock">
+        <div className="agent-bottom-controls agent-bottom-controls--main">
+          <div className="sequence-controls" role="group" aria-label="Animation sequence">
+            {SEQUENCE_STEPS.map(({ label }, index) => {
+              const step = index as UnifiedAgentSequenceStep;
+              const active = (viewMode === 'list' ? activeSequenceStep : carouselStep) === step;
               return (
                 <button
-                  key={value}
+                  key={`${index}-${label}`}
                   type="button"
                   className={active ? 'is-active' : ''}
-                  aria-label={`Use ${label} field`}
+                  aria-label={`${index + 1}. ${label}`}
                   aria-pressed={active}
-                  onClick={() => {
-                    if (!active && soundEnabled) playControlSound('tick', 0.07);
-                    setAccentColor(value);
-                  }}
+                  onClick={() => selectSequenceStep(step)}
                 >
-                  <span
-                    className="color-control__swatch"
-                    style={{ '--swatch-color': value } as CSSProperties}
-                    aria-hidden="true"
-                  />
+                  <span className="sequence-step__number" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <span className="sequence-step__label">{label}</span>
                 </button>
               );
             })}
-            <label className="custom-color-control" title="Custom color">
-              <input
-                type="color"
-                value={accentColor}
-                aria-label="Choose custom field color"
-                onInput={(event) => setAccentColor(event.currentTarget.value.toUpperCase())}
-              />
-              <span
-                className="custom-color-control__swatch"
-                style={{ '--swatch-color': accentColor } as CSSProperties}
-                aria-hidden="true"
-              />
-            </label>
           </div>
 
           <span className="bottom-controls-divider" aria-hidden="true" />
 
+          <div className="agent-utility-controls">
+            <div className="detail-controls" role="group" aria-label="Agent display size">
+              {([1, 2, 4] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={detail === value ? 'is-active' : ''}
+                  disabled={captureBusy || recording}
+                  aria-label={`Display agent at ${value * 80} pixels`}
+                  aria-pressed={detail === value}
+                  onClick={() => {
+                    if (value !== detail && soundEnabled) playControlSound('tick', 0.09);
+                    setDetail(value);
+                  }}
+                >
+                  {value}×
+                </button>
+              ))}
+            </div>
+
+            <span className="bottom-controls-divider" aria-hidden="true" />
+
+            <div className="color-controls" role="group" aria-label="Agent field color">
+              {COLOR_PRESETS.map(({ label, value }) => {
+                const active = accentColor.toUpperCase() === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className={active ? 'is-active' : ''}
+                    aria-label={`Use ${label} field`}
+                    aria-pressed={active}
+                    onClick={() => {
+                      if (!active && soundEnabled) playControlSound('tick', 0.07);
+                      setAccentColor(value);
+                    }}
+                  >
+                    <span
+                      className="color-control__swatch"
+                      style={{ '--swatch-color': value } as CSSProperties}
+                      aria-hidden="true"
+                    />
+                  </button>
+                );
+              })}
+              <label className="custom-color-control" title="Custom color">
+                <input
+                  type="color"
+                  value={accentColor}
+                  aria-label="Choose custom field color"
+                  onInput={(event) => setAccentColor(event.currentTarget.value.toUpperCase())}
+                />
+                <span
+                  className="custom-color-control__swatch"
+                  style={{ '--swatch-color': accentColor } as CSSProperties}
+                  aria-hidden="true"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div className="agent-bottom-controls agent-bottom-controls--capture">
           <div
             className="capture-controls"
             data-error={Boolean(captureError)}
@@ -585,10 +568,14 @@ export function UnifiedAgent() {
                       if (value !== exportScale && soundEnabled) playControlSound('tick', 0.07);
                       setExportScale(value as AgentCaptureScale);
                     }}
-                  />
+                  >
+                    {value}×
+                  </button>
                 );
               })}
             </div>
+
+            <span className="bottom-controls-divider" aria-hidden="true" />
 
             <button
               type="button"
@@ -603,8 +590,12 @@ export function UnifiedAgent() {
               aria-pressed={recording}
               onClick={toggleRecording}
             >
-              <RecordGlyph recording={recording} />
+              <span className="capture-action__record-dot" aria-hidden="true" />
+              <span>{recording ? `Record ${formatRecordingTime(recordingSeconds)}` : 'Record'}</span>
             </button>
+
+            <span className="bottom-controls-divider" aria-hidden="true" />
+
             <button
               type="button"
               className="capture-action"
@@ -612,7 +603,7 @@ export function UnifiedAgent() {
               aria-label={`Save transparent PNG at ${captureSize} by ${captureSize} pixels`}
               onClick={() => void savePng()}
             >
-              <SnapshotGlyph />
+              PNG
             </button>
             <button
               type="button"
@@ -621,7 +612,7 @@ export function UnifiedAgent() {
               aria-label={`Save transparent SVG at ${captureSize} by ${captureSize} pixels`}
               onClick={saveSvg}
             >
-              <VectorGlyph />
+              SVG
             </button>
             <span className="capture-status" role="status" aria-live="polite">
               {captureError ||

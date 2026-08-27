@@ -441,7 +441,7 @@ canvas {
   box-shadow: none;
 }
 
-.agent-bottom-controls {
+.agent-bottom-dock {
   position: absolute;
   z-index: 1000;
   bottom: 18px;
@@ -449,22 +449,35 @@ canvas {
   display: flex;
   width: max-content;
   max-width: calc(100vw - 24px);
-  min-height: 35px;
   flex-direction: row;
   align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
+  gap: 8px;
+  padding: 0;
   overflow-x: auto;
-  border: 0;
-  border-radius: 999px;
-  background: var(--control-surface);
-  box-shadow: none;
   scrollbar-width: none;
   transform: translateX(-50%);
 }
 
-.agent-bottom-controls::-webkit-scrollbar {
+.agent-bottom-dock::-webkit-scrollbar {
   display: none;
+}
+
+.agent-bottom-controls {
+  display: flex;
+  min-height: 35px;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--control-surface);
+  box-shadow: none;
+}
+
+.agent-bottom-controls--capture {
+  padding-inline: 5px;
 }
 
 .sequence-controls {
@@ -490,7 +503,7 @@ canvas {
   background: transparent;
   cursor: pointer;
   font-family: var(--font-geist-sans), sans-serif;
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 520;
   letter-spacing: -0.01em;
   transition:
@@ -549,54 +562,35 @@ canvas {
 }
 
 .capture-scale-control {
-  position: relative;
   display: flex;
-  width: 58px;
   height: 23px;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 3px;
-}
-
-.capture-scale-control::before {
-  position: absolute;
-  right: 8px;
-  left: 8px;
-  height: 2px;
-  border-radius: 99px;
-  background: var(--control-recessed);
-  content: '';
+  gap: 0;
+  padding: 0;
 }
 
 .capture-scale-control button {
-  position: relative;
-  z-index: 1;
   display: grid;
-  width: 17px;
+  width: 31px;
   height: 23px;
   padding: 0;
   place-items: center;
   border: 0;
-  border-radius: 50%;
+  border-radius: 999px;
+  color: var(--control-muted);
   background: transparent;
   cursor: pointer;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  transition: color 180ms ease, background-color 180ms ease, opacity 180ms ease;
 }
 
-.capture-scale-control button::before {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--control-muted);
-  content: '';
-  transition: width 180ms ease, height 180ms ease, background-color 180ms ease;
-}
-
-.capture-scale-control button.is-active::before {
-  width: 11px;
-  height: 11px;
-  background: var(--accent);
-  box-shadow: 0 0 0 2px var(--control-surface);
+.capture-scale-control button.is-active {
+  color: var(--accent);
+  background: var(--control-active);
 }
 
 .capture-scale-control button:focus-visible {
@@ -604,19 +598,36 @@ canvas {
   background: var(--control-active);
 }
 
+.capture-scale-control button:disabled {
+  opacity: 0.36;
+  cursor: default;
+}
+
 .capture-action {
-  display: grid;
-  width: 25px;
+  display: flex;
+  width: auto;
+  min-width: 37px;
   height: 23px;
   flex: 0 0 auto;
-  padding: 0;
-  place-items: center;
+  padding: 0 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 999px;
   color: var(--control-muted);
   background: transparent;
   cursor: pointer;
+  font-family: var(--font-geist-sans), sans-serif;
+  font-size: 9px;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  line-height: 1;
   transition: color 180ms ease, background-color 180ms ease, opacity 180ms ease;
+}
+
+.capture-action--record {
+  width: 88px;
 }
 
 .capture-action:hover,
@@ -636,29 +647,13 @@ canvas {
   background: var(--control-active);
 }
 
-.capture-glyph {
-  display: block;
-  width: 15px;
-  height: 15px;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.2;
-}
-
-.capture-glyph--record {
-  width: 8px;
-  height: 8px;
+.capture-action__record-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
   border-radius: 50%;
-  background: currentColor;
-  transition: border-radius 160ms ease, transform 160ms ease;
-}
-
-.capture-glyph--record[data-recording='true'] {
-  border-radius: 2px;
-  transform: scale(0.86);
+  background: #ff4b4b;
+  opacity: 0.74;
 }
 
 .capture-status {
@@ -795,7 +790,7 @@ canvas {
 }
 
 @media (max-width: 560px) {
-  .agent-bottom-controls {
+  .agent-bottom-dock {
     left: 50%;
     max-width: calc(100vw - 24px);
     overflow-x: auto;
