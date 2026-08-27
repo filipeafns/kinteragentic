@@ -39,7 +39,6 @@ const SEQUENCE_STEPS: ReadonlyArray<{
   { carouselIndex: 0, label: 'Idle', scene: 'agent' },
   { carouselIndex: 2, label: 'Contract', scene: 'collapse' },
 ];
-const AUTOPLAY_MS = 3_000;
 const DEFAULT_ACCENT = '#67A2E7';
 const COLOR_PRESETS = [
   { label: 'Amber 300', value: '#F6C875' },
@@ -49,20 +48,6 @@ const COLOR_PRESETS = [
   { label: 'Blue 300', value: '#67A2E7' },
   { label: 'Green 300', value: '#67E789' },
 ] as const;
-
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(media.matches);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-
-  return reduced;
-}
 
 function shortestDelta(index: number, selectedIndex: number) {
   let delta = (index - selectedIndex + CAROUSEL_STATES.length) % CAROUSEL_STATES.length;
@@ -221,7 +206,6 @@ function AgentCanvas({
 }
 
 export function UnifiedAgent() {
-  const shouldReduceMotion = useReducedMotion();
   const [activeSequenceStep, setActiveSequenceStep] = useState<UnifiedAgentSequenceStep>(0);
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [carouselStep, setCarouselStep] = useState<UnifiedAgentSequenceStep>(0);
@@ -302,12 +286,6 @@ export function UnifiedAgent() {
     configureSoundSystem(soundEnabled);
     return stopSoundSequences;
   }, [soundEnabled]);
-
-  useEffect(() => {
-    if (viewMode !== 'grid' || shouldReduceMotion) return;
-    const autoplay = window.setTimeout(() => selectRelative(1), AUTOPLAY_MS);
-    return () => window.clearTimeout(autoplay);
-  }, [carouselStep, selectRelative, shouldReduceMotion, viewMode]);
 
   useEffect(() => {
     if (!soundMounted.current) {
@@ -435,7 +413,7 @@ export function UnifiedAgent() {
             }}
             requestedStep={requestedStep}
             theme={theme}
-            variant="auto"
+            variant="agent"
           />
         </section>
       ) : (

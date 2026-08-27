@@ -2,7 +2,7 @@ export type UnifiedAgentTheme = 'light' | 'dark';
 export type UnifiedAgentDetail = 1 | 2 | 4;
 
 type AgentScene = 'agent' | 'fast' | 'collapse';
-export type UnifiedAgentVariant = 'auto' | AgentScene;
+export type UnifiedAgentVariant = AgentScene;
 export type UnifiedAgentSequenceStep = 0 | 1 | 2 | 3;
 
 type Target = {
@@ -421,7 +421,6 @@ export class UnifiedAgentEngine {
   private fieldRadius = FACE_SPHERE_RADIUS + 7;
   private interactive: boolean;
   private lastTime = 0;
-  private manualScene: AgentScene | null = null;
   private nodes: Node[];
   private onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
   private pendingPointer = {
@@ -522,17 +521,10 @@ export class UnifiedAgentEngine {
   }
 
   setVariant(variant: UnifiedAgentVariant) {
-    if (variant === 'auto') {
-      this.manualScene = null;
-      this.transitionToStep(0, performance.now());
-      return;
-    }
-    this.manualScene = variant;
     this.transitionTo(variant, performance.now());
   }
 
   playSequenceStep(step: UnifiedAgentSequenceStep) {
-    this.manualScene = null;
     this.transitionToStep(step, performance.now());
   }
 
@@ -737,11 +729,6 @@ export class UnifiedAgentEngine {
     this.transitionTo(STEP_SCENES[step], time);
   }
 
-  private beginScene(time: number) {
-    const nextStep = ((this.sequenceStep + 1) % STEP_SCENES.length) as UnifiedAgentSequenceStep;
-    this.transitionToStep(nextStep, time);
-  }
-
   private tick = (time: number) => {
     const frameDelta = this.lastTime
       ? Math.min(MAX_FRAME_CATCHUP_SECONDS, (time - this.lastTime) / 1000)
@@ -751,14 +738,9 @@ export class UnifiedAgentEngine {
     if (!this.prefersReducedMotion.matches) {
       this.flushPointer();
       let transitioned = false;
-      if (elapsed >= STEP_DURATION) {
-        if (this.manualScene === null) {
-          this.beginScene(time);
-          transitioned = true;
-        } else if (this.manualScene === 'collapse') {
-          this.transitionTo('collapse', time);
-          transitioned = true;
-        }
+      if (elapsed >= STEP_DURATION && this.scene === 'collapse') {
+        this.transitionTo('collapse', time);
+        transitioned = true;
       }
       if (transitioned || frameDelta === 0) {
         this.update(time, Math.min(frameDelta, PHYSICS_STEP_SECONDS));
