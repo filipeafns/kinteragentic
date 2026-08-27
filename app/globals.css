@@ -609,7 +609,7 @@ canvas {
   min-width: 37px;
   height: 23px;
   flex: 0 0 auto;
-  padding: 0 8px;
+  padding: 0 10px;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -619,7 +619,7 @@ canvas {
   background: transparent;
   cursor: pointer;
   font-family: var(--font-geist-sans), sans-serif;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 560;
   letter-spacing: 0.01em;
   line-height: 1;
@@ -627,13 +627,13 @@ canvas {
 }
 
 .capture-action--record {
-  min-width: 105px;
+  min-width: 118px;
 }
 
 .capture-action__shortcut {
   color: currentColor;
   font-family: var(--font-geist-mono), monospace;
-  font-size: 7px;
+  font-size: 8px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1;
