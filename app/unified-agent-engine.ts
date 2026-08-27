@@ -47,6 +47,8 @@ const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
 const STEP_SCENES: readonly AgentScene[] = ['agent', 'fast', 'agent', 'collapse'];
 
+export const UNIFIED_AGENT_EXPORT_SIZE = 360;
+
 const BACKGROUNDS: Record<UnifiedAgentTheme, string> = {
   light: '#FFFFFF',
   dark: '#0A0506',
@@ -121,6 +123,10 @@ function blendHex(color: string, background: string, amount: number) {
 function hexToRgba(color: string, alpha: number) {
   const { red, green, blue } = hexChannels(color);
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function formatNumber(value: number) {
+  return Number(value.toFixed(3));
 }
 
 function blinkAmount(localTime: number) {
@@ -528,6 +534,84 @@ export class UnifiedAgentEngine {
     this.transitionToStep(step, performance.now());
   }
 
+  renderExportFrame(
+    canvas: HTMLCanvasElement,
+    options?: { contentScale?: number; transparent?: boolean },
+  ) {
+    const context = canvas.getContext('2d', { alpha: true });
+    if (!context) throw new Error('Canvas 2D is unavailable for export.');
+    const width = Math.max(1, canvas.width);
+    const height = Math.max(1, canvas.height);
+    const scale =
+      (Math.min(width, height) / LOGICAL_SIZE) * clamp(options?.contentScale ?? 1, 0.1, 4);
+    const offsetX = width * 0.5 - CENTER * scale;
+    const offsetY = height * 0.5 - CENTER * scale;
+
+    context.resetTransform();
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'source-over';
+    context.clearRect(0, 0, width, height);
+    if (!options?.transparent) {
+      context.fillStyle = BACKGROUNDS[this.theme];
+      context.fillRect(0, 0, width, height);
+    }
+    context.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+    context.imageSmoothingEnabled = true;
+    this.paint(context, false);
+  }
+
+  createSvg(size = UNIFIED_AGENT_EXPORT_SIZE, contentScale = 1) {
+    const gradientId = 'agent-feather';
+    const fieldColor = this.getFieldColor();
+    const fieldAlpha = this.theme === 'light' ? 0.5 : 0.94;
+    const ordered = [...this.nodes].sort((a, b) => a.z - b.z);
+    const gradientStops = [
+      [0, fieldAlpha],
+      [0.22, fieldAlpha * 0.98],
+      [0.48, fieldAlpha * 0.78],
+      [0.7, fieldAlpha * 0.48],
+      [0.88, fieldAlpha * 0.16],
+      [1, 0],
+    ]
+      .map(
+        ([offset, opacity]) =>
+          `<stop offset="${formatNumber(offset * 100)}%" stop-color="${fieldColor}" stop-opacity="${formatNumber(opacity)}"/>`,
+      )
+      .join('');
+    const trails = this.scene === 'fast' ? this.svgTrails(ordered) : '';
+    const nodes = ordered
+      .map((node) => {
+        const x = formatNumber(CENTER + node.x);
+        const y = formatNumber(CENTER + node.y);
+        const radiusX = formatNumber(clamp(node.radiusX, 0.34, 5.2));
+        const radiusY = formatNumber(clamp(node.radiusY, 0.34, 12.5));
+        const angle = formatNumber(((node.angle ?? 0) * 180) / Math.PI);
+        const fill = node.slot < 2 ? '#000000' : '#777777';
+        const style = node.slot < 2 ? '' : ' style="mix-blend-mode:multiply"';
+        return `<ellipse cx="${x}" cy="${y}" rx="${radiusX}" ry="${radiusY}" fill="${fill}" opacity="${formatNumber(node.alpha)}" transform="rotate(${angle} ${x} ${y})"${style}/>`;
+      })
+      .join('');
+
+    const scene = [
+      `<circle cx="90" cy="90" r="${formatNumber(this.fieldRadius)}" fill="url(#${gradientId})"/>`,
+      trails,
+      nodes,
+    ].join('');
+    const normalizedScale = clamp(contentScale, 0.1, 4);
+    const transformedScene =
+      normalizedScale === 1
+        ? scene
+        : `<g transform="translate(90 90) scale(${formatNumber(normalizedScale)}) translate(-90 -90)">${scene}</g>`;
+
+    return [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.max(1, Math.round(size))}" height="${Math.max(1, Math.round(size))}" viewBox="0 0 180 180" fill="none" style="isolation:isolate">`,
+      '<title>Magnetic agent</title>',
+      `<defs><radialGradient id="${gradientId}" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(90 90) scale(${formatNumber(this.fieldRadius)})">${gradientStops}</radialGradient></defs>`,
+      transformedScene,
+      '</svg>',
+    ].join('');
+  }
+
   private resize = () => {
     const bounds = this.canvas.getBoundingClientRect();
     const cssSize = Math.max(1, Math.min(bounds.width || 320, bounds.height || 320));
@@ -769,11 +853,13 @@ export class UnifiedAgentEngine {
     }
   }
 
-  private draw() {
-    const context = this.context;
-    const background = BACKGROUNDS[this.theme];
-    const fieldColor =
-      this.theme === 'dark' ? blendHex(this.accentColor, '#FFFFFF', 0.14) : this.accentColor;
+  private getFieldColor() {
+    return this.theme === 'dark'
+      ? blendHex(this.accentColor, '#FFFFFF', 0.14)
+      : this.accentColor;
+  }
+
+  private updateFieldRadius() {
     const extents = this.nodes
       .map((node) => Math.hypot(node.x, node.y) + Math.max(node.radiusX, node.radiusY))
       .sort((a, b) => a - b);
@@ -783,11 +869,44 @@ export class UnifiedAgentEngine {
         ? clamp(representativeExtent + 5.5, 14, FACE_SPHERE_RADIUS + 11)
         : FACE_SPHERE_RADIUS + 7;
     this.fieldRadius = mix(this.fieldRadius, targetFieldRadius, this.scene === 'collapse' ? 0.16 : 0.09);
+  }
+
+  private svgTrails(ordered: Node[]) {
+    const trailSteps = 6;
+    const trails: string[] = [];
+    for (const node of ordered) {
+      if (node.slot < 2) continue;
+      const speed = Math.hypot(node.velocityX, node.velocityY);
+      if (speed < 0.01) continue;
+      const directionX = node.velocityX / speed;
+      const directionY = node.velocityY / speed;
+      const trailLength = clamp(speed * 0.052, 4.5, 15);
+      const radius = clamp((node.radiusX + node.radiusY) * 0.5, 0.34, 5.2);
+      for (let step = trailSteps; step >= 1; step -= 1) {
+        const progress = step / (trailSteps + 1);
+        trails.push(
+          `<circle cx="${formatNumber(CENTER + node.x - directionX * trailLength * progress)}" cy="${formatNumber(CENTER + node.y - directionY * trailLength * progress)}" r="${formatNumber(radius * mix(0.72, 0.96, 1 - progress))}" fill="#777777" opacity="${formatNumber(node.alpha * Math.pow(1 - progress, 1.65) * 0.34)}"/>`,
+        );
+      }
+    }
+    return `<g style="mix-blend-mode:multiply">${trails.join('')}</g>`;
+  }
+
+  private draw() {
+    this.updateFieldRadius();
+    this.paint(this.context, true);
+  }
+
+  private paint(context: CanvasRenderingContext2D, includeBackground: boolean) {
+    const background = BACKGROUNDS[this.theme];
+    const fieldColor = this.getFieldColor();
 
     context.globalCompositeOperation = 'source-over';
     context.globalAlpha = 1;
-    context.fillStyle = background;
-    context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
+    if (includeBackground) {
+      context.fillStyle = background;
+      context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
+    }
 
     const field = context.createRadialGradient(
       CENTER,

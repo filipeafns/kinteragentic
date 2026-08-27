@@ -12,10 +12,12 @@ import {
 import {
   type UnifiedAgentDetail,
   UnifiedAgentEngine,
+  UNIFIED_AGENT_EXPORT_SIZE,
   type UnifiedAgentSequenceStep,
   type UnifiedAgentTheme,
   type UnifiedAgentVariant,
 } from './unified-agent-engine';
+import { type AgentCaptureScale, useAgentCapture } from './use-agent-capture';
 
 type ViewMode = 'list' | 'grid';
 type CarouselStyle = CSSProperties & {
@@ -137,6 +139,31 @@ function GridGlyph() {
   );
 }
 
+function RecordGlyph({ recording }: { recording: boolean }) {
+  return <span className="capture-glyph capture-glyph--record" data-recording={recording} aria-hidden="true" />;
+}
+
+function SnapshotGlyph() {
+  return (
+    <svg className="capture-glyph" viewBox="0 0 18 18" aria-hidden="true">
+      <rect x="2.25" y="3.25" width="13.5" height="11.5" rx="2" />
+      <circle cx="11.8" cy="6.8" r="1.15" />
+      <path d="M3.7 12.9 7.2 9.5l2.1 2 1.4-1.25 3.6 2.65" />
+    </svg>
+  );
+}
+
+function VectorGlyph() {
+  return (
+    <svg className="capture-glyph" viewBox="0 0 18 18" aria-hidden="true">
+      <path d="M4 13.5C4.6 7.2 8.1 4.5 14 4.5M4 13.5c4.2.4 7.4-1 10-4.1" />
+      <circle cx="4" cy="13.5" r="1.45" />
+      <circle cx="14" cy="4.5" r="1.45" />
+      <circle cx="14" cy="9.4" r="1.45" />
+    </svg>
+  );
+}
+
 function AgentCanvas({
   accentColor,
   decorative = false,
@@ -144,6 +171,7 @@ function AgentCanvas({
   label,
   onSequenceStepChange,
   onPointerEnter,
+  onEngineReady,
   requestedStep,
   theme,
   variant,
@@ -154,6 +182,7 @@ function AgentCanvas({
   label: string;
   onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
   onPointerEnter: () => void;
+  onEngineReady?: (engine: UnifiedAgentEngine | null) => void;
   requestedStep?: { id: number; step: UnifiedAgentSequenceStep } | null;
   theme: UnifiedAgentTheme;
   variant: UnifiedAgentVariant;
@@ -165,10 +194,12 @@ function AgentCanvas({
   const initialDetail = useRef(detail);
   const initialStepChange = useRef(onSequenceStepChange);
   const initialTheme = useRef(theme);
+  const initialEngineReady = useRef(onEngineReady);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const notifyEngineReady = initialEngineReady.current;
     const engine = new UnifiedAgentEngine(canvas, {
       accentColor: initialAccentColor.current,
       detail: initialDetail.current,
@@ -177,9 +208,11 @@ function AgentCanvas({
       theme: initialTheme.current,
     });
     engineRef.current = engine;
+    notifyEngineReady?.(engine);
     return () => {
       engine.destroy();
       engineRef.current = null;
+      notifyEngineReady?.(null);
     };
   }, []);
 
@@ -207,6 +240,7 @@ export function UnifiedAgent() {
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [carouselStep, setCarouselStep] = useState<UnifiedAgentSequenceStep>(0);
   const [detail, setDetail] = useState<UnifiedAgentDetail>(1);
+  const [exportScale, setExportScale] = useState<AgentCaptureScale>(1);
   const [requestedStep, setRequestedStep] = useState<{
     id: number;
     step: UnifiedAgentSequenceStep;
@@ -215,9 +249,29 @@ export function UnifiedAgent() {
   const [theme, setTheme] = useState<UnifiedAgentTheme>('light');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const requestId = useRef(0);
+  const mainEngineRef = useRef<UnifiedAgentEngine | null>(null);
+  const carouselEngineRefs = useRef<Array<UnifiedAgentEngine | null>>([]);
   const soundMounted = useRef(false);
   const stageSize = detail * 80;
   const selectedIndex = SEQUENCE_STEPS[carouselStep].carouselIndex;
+  const captureSize = UNIFIED_AGENT_EXPORT_SIZE * exportScale;
+  const getCaptureEngine = useCallback(
+    () =>
+      viewMode === 'list'
+        ? mainEngineRef.current
+        : (carouselEngineRefs.current[selectedIndex] ?? null),
+    [selectedIndex, viewMode],
+  );
+  const {
+    busy: captureBusy,
+    error: captureError,
+    lastExport,
+    recording,
+    recordingSeconds,
+    savePng,
+    saveSvg,
+    toggleRecording,
+  } = useAgentCapture(getCaptureEngine, exportScale, detail);
 
   const selectRelative = useCallback((step: number) => {
     setCarouselStep(
@@ -264,7 +318,13 @@ export function UnifiedAgent() {
   };
 
   return (
-    <main className={`morph-experience unified-agent-page theme--${theme} mode--${viewMode}`}>
+    <main
+      className={`morph-experience unified-agent-page theme--${theme} mode--${viewMode}`}
+      data-capture-format={lastExport?.format}
+      data-capture-size={lastExport?.size}
+      data-capture-bytes={lastExport?.bytes}
+      data-recording={recording}
+    >
       <div className="experience-controls" aria-label="Display controls">
         <div className="theme-control">
           <span className={theme === 'light' ? 'is-active' : ''}>Light</span>
@@ -306,6 +366,7 @@ export function UnifiedAgent() {
           <button
             type="button"
             className={`view-switch__button ${viewMode === 'list' ? 'is-active' : ''}`}
+            disabled={captureBusy || recording}
             aria-label="List view"
             aria-pressed={viewMode === 'list'}
             onClick={() => {
@@ -318,6 +379,7 @@ export function UnifiedAgent() {
           <button
             type="button"
             className={`view-switch__button ${viewMode === 'grid' ? 'is-active' : ''}`}
+            disabled={captureBusy || recording}
             aria-label="Grid carousel view"
             aria-pressed={viewMode === 'grid'}
             onClick={() => {
@@ -328,6 +390,13 @@ export function UnifiedAgent() {
             <GridGlyph />
           </button>
         </div>
+      </div>
+
+      <div className="capture-frame" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
       </div>
 
       {viewMode === 'list' ? (
@@ -341,6 +410,9 @@ export function UnifiedAgent() {
             detail={detail}
             label="A black-eyed rotating particle agent over a feathered color field"
             onSequenceStepChange={setActiveSequenceStep}
+            onEngineReady={(engine) => {
+              mainEngineRef.current = engine;
+            }}
             onPointerEnter={() => {
               if (soundEnabled) playHoverSignature('agent');
             }}
@@ -376,6 +448,7 @@ export function UnifiedAgent() {
               <button
                 type="button"
                 className="agent-carousel__button"
+                disabled={captureBusy || recording}
                 aria-label={`Select ${state === 'agent' ? 'aware face' : state === 'fast' ? 'dizzy fast' : 'void collapse'} state`}
                 aria-pressed={index === selectedIndex}
                 onClick={() => selectCarouselState(index)}
@@ -387,6 +460,9 @@ export function UnifiedAgent() {
                   label=""
                   onPointerEnter={() => {
                     if (soundEnabled) playHoverSignature(state);
+                  }}
+                  onEngineReady={(engine) => {
+                    carouselEngineRefs.current[index] = engine;
                   }}
                   theme={theme}
                   variant={state}
@@ -429,6 +505,7 @@ export function UnifiedAgent() {
                 key={value}
                 type="button"
                 className={detail === value ? 'is-active' : ''}
+                disabled={captureBusy || recording}
                 aria-label={`Display agent at ${value * 80} pixels`}
                 aria-pressed={detail === value}
                 onClick={() => {
@@ -479,6 +556,81 @@ export function UnifiedAgent() {
                 aria-hidden="true"
               />
             </label>
+          </div>
+
+          <span className="bottom-controls-divider" aria-hidden="true" />
+
+          <div
+            className="capture-controls"
+            data-error={Boolean(captureError)}
+            role="group"
+            aria-label="Capture and export"
+          >
+            <div
+              className="capture-scale-control"
+              role="group"
+              aria-label={`Export size, currently ${captureSize} by ${captureSize} pixels`}
+            >
+              {([1, 2, 3] as const).map((value) => {
+                const outputSize = UNIFIED_AGENT_EXPORT_SIZE * value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className={exportScale === value ? 'is-active' : ''}
+                    disabled={captureBusy || recording}
+                    aria-label={`${value} times, ${outputSize} by ${outputSize} pixels`}
+                    aria-pressed={exportScale === value}
+                    onClick={() => {
+                      if (value !== exportScale && soundEnabled) playControlSound('tick', 0.07);
+                      setExportScale(value as AgentCaptureScale);
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="capture-action capture-action--record"
+              data-recording={recording}
+              disabled={captureBusy}
+              aria-label={
+                recording
+                  ? `Stop and save MP4 recording, ${recordingSeconds} seconds captured`
+                  : `Record ${captureSize} by ${captureSize} MP4 at 30 frames per second`
+              }
+              aria-pressed={recording}
+              onClick={toggleRecording}
+            >
+              <RecordGlyph recording={recording} />
+            </button>
+            <button
+              type="button"
+              className="capture-action"
+              disabled={captureBusy || recording}
+              aria-label={`Save transparent PNG at ${captureSize} by ${captureSize} pixels`}
+              onClick={() => void savePng()}
+            >
+              <SnapshotGlyph />
+            </button>
+            <button
+              type="button"
+              className="capture-action"
+              disabled={captureBusy || recording}
+              aria-label={`Save transparent SVG at ${captureSize} by ${captureSize} pixels`}
+              onClick={saveSvg}
+            >
+              <VectorGlyph />
+            </button>
+            <span className="capture-status" role="status" aria-live="polite">
+              {captureError ||
+                (recording
+                  ? `Recording MP4 at 30 frames per second. ${recordingSeconds} seconds captured.`
+                  : lastExport
+                    ? `${lastExport.format.toUpperCase()} saved at ${lastExport.size} pixels.`
+                    : '')}
+            </span>
           </div>
         </div>
       </div>
