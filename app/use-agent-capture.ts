@@ -59,7 +59,7 @@ function triggerDownload(blob: Blob, format: AgentCaptureFormat, size: number) {
   anchor.href = url;
   anchor.download = captureFilename(format, size);
   anchor.rel = 'noopener';
-  document.body.append(anchor);
+  document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
@@ -317,13 +317,16 @@ export function useAgentCapture(
 
     try {
       let stream = canvas.captureStream(0);
-      let videoTrack = stream.getVideoTracks()[0];
+      const canvasTrack = stream.getVideoTracks()[0] as
+        | CanvasCaptureMediaStreamTrack
+        | undefined;
+      const manualFrameTrack =
+        canvasTrack && typeof canvasTrack.requestFrame === 'function' ? canvasTrack : null;
       let requestFrame =
-        typeof videoTrack?.requestFrame === 'function' ? () => videoTrack.requestFrame() : null;
+        manualFrameTrack ? () => manualFrameTrack.requestFrame() : null;
       if (!requestFrame) {
         stream.getTracks().forEach((track) => track.stop());
         stream = canvas.captureStream(RECORDING_FPS);
-        videoTrack = stream.getVideoTracks()[0];
         requestFrame = null;
       }
       const recorder = new MediaRecorder(stream, {
