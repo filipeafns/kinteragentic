@@ -612,7 +612,7 @@ canvas {
   padding: 0 8px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   border: 0;
   border-radius: 999px;
   color: var(--control-muted);
@@ -627,7 +627,17 @@ canvas {
 }
 
 .capture-action--record {
-  width: 88px;
+  min-width: 105px;
+}
+
+.capture-action__shortcut {
+  color: currentColor;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  opacity: 0.46;
 }
 
 .capture-action:hover,

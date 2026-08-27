@@ -145,6 +145,11 @@ function formatRecordingTime(seconds: number) {
   return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
 }
 
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || Boolean(target.closest('input, textarea, select'));
+}
+
 function AgentCanvas({
   accentColor,
   decorative = false,
@@ -253,6 +258,37 @@ export function UnifiedAgent() {
     saveSvg,
     toggleRecording,
   } = useAgentCapture(getCaptureEngine, exportScale, detail);
+
+  useEffect(() => {
+    const onCaptureShortcut = (event: KeyboardEvent) => {
+      if (
+        event.repeat ||
+        event.defaultPrevented ||
+        !event.shiftKey ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        isEditableShortcutTarget(event.target)
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === 'r' && !captureBusy) {
+        event.preventDefault();
+        toggleRecording();
+      } else if (key === 'b' && !captureBusy && !recording) {
+        event.preventDefault();
+        void savePng();
+      } else if (key === 's' && !captureBusy && !recording) {
+        event.preventDefault();
+        saveSvg();
+      }
+    };
+
+    window.addEventListener('keydown', onCaptureShortcut);
+    return () => window.removeEventListener('keydown', onCaptureShortcut);
+  }, [captureBusy, recording, savePng, saveSvg, toggleRecording]);
 
   const selectRelative = useCallback((step: number) => {
     setCarouselStep(
@@ -584,14 +620,18 @@ export function UnifiedAgent() {
               disabled={captureBusy}
               aria-label={
                 recording
-                  ? `Stop and save MP4 recording, ${recordingSeconds} seconds captured`
-                  : `Record ${captureSize} by ${captureSize} MP4 at 30 frames per second`
+                  ? `Stop and save MP4 recording, ${recordingSeconds} seconds captured. Shortcut Shift R`
+                  : `Record ${captureSize} by ${captureSize} MP4 at 30 frames per second. Shortcut Shift R`
               }
+              aria-keyshortcuts="Shift+R"
               aria-pressed={recording}
               onClick={toggleRecording}
             >
               <span className="capture-action__record-dot" aria-hidden="true" />
               <span>{recording ? `Record ${formatRecordingTime(recordingSeconds)}` : 'Record'}</span>
+              <kbd className="capture-action__shortcut" aria-hidden="true">
+                ⇧R
+              </kbd>
             </button>
 
             <span className="bottom-controls-divider" aria-hidden="true" />
@@ -600,19 +640,27 @@ export function UnifiedAgent() {
               type="button"
               className="capture-action"
               disabled={captureBusy || recording}
-              aria-label={`Save transparent PNG at ${captureSize} by ${captureSize} pixels`}
+              aria-label={`Save transparent PNG at ${captureSize} by ${captureSize} pixels. Shortcut Shift B`}
+              aria-keyshortcuts="Shift+B"
               onClick={() => void savePng()}
             >
-              PNG
+              <span>PNG</span>
+              <kbd className="capture-action__shortcut" aria-hidden="true">
+                ⇧B
+              </kbd>
             </button>
             <button
               type="button"
               className="capture-action"
               disabled={captureBusy || recording}
-              aria-label={`Save transparent SVG at ${captureSize} by ${captureSize} pixels`}
+              aria-label={`Save transparent SVG at ${captureSize} by ${captureSize} pixels. Shortcut Shift S`}
+              aria-keyshortcuts="Shift+S"
               onClick={saveSvg}
             >
-              SVG
+              <span>SVG</span>
+              <kbd className="capture-action__shortcut" aria-hidden="true">
+                ⇧S
+              </kbd>
             </button>
             <span className="capture-status" role="status" aria-live="polite">
               {captureError ||
