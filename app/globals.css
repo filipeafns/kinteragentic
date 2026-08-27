@@ -609,17 +609,17 @@ canvas {
   min-width: 37px;
   height: 23px;
   flex: 0 0 auto;
-  padding: 0 8px;
+  padding: 0 10px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   border: 0;
   border-radius: 999px;
   color: var(--control-muted);
   background: transparent;
   cursor: pointer;
   font-family: var(--font-geist-sans), sans-serif;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 560;
   letter-spacing: 0.01em;
   line-height: 1;
@@ -627,7 +627,17 @@ canvas {
 }
 
 .capture-action--record {
-  width: 88px;
+  min-width: 118px;
+}
+
+.capture-action__shortcut {
+  color: currentColor;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  opacity: 0.46;
 }
 
 .capture-action:hover,

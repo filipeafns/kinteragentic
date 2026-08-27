@@ -1,7 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { BufferTarget, CanvasSource, Mp4OutputFormat, Output } from 'mediabunny';
+import type {
+  BufferTarget,
+  MediaStreamVideoTrackSource,
+  Mp4OutputFormat,
+  Output,
+} from 'mediabunny';
 import {
   UNIFIED_AGENT_EXPORT_SIZE,
   type UnifiedAgentDetail,
@@ -24,10 +29,11 @@ type EncodedSession = {
   frameIndex: number;
   kind: 'encoded';
   output: Output<Mp4OutputFormat, BufferTarget>;
-  pending: Promise<void>;
-  source: CanvasSource;
+  requestFrame: (() => void) | null;
+  source: MediaStreamVideoTrackSource;
   startedAt: number;
   stopping: boolean;
+  stream: MediaStream;
 };
 
 type RecorderSession = {
@@ -47,6 +53,29 @@ type CaptureSession = EncodedSession | RecorderSession;
 
 const RECORDING_FPS = 30;
 const RECORDING_FRAME_MS = 1000 / RECORDING_FPS;
+
+function createCanvasCaptureStream(canvas: HTMLCanvasElement) {
+  if (typeof HTMLCanvasElement.prototype.captureStream !== 'function') return null;
+  let stream = canvas.captureStream(0);
+  const canvasTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
+  const manualFrameTrack =
+    canvasTrack && typeof canvasTrack.requestFrame === 'function' ? canvasTrack : null;
+  if (manualFrameTrack) {
+    return {
+      requestFrame: () => manualFrameTrack.requestFrame(),
+      stream,
+    };
+  }
+  stream.getTracks().forEach((track) => track.stop());
+  stream = canvas.captureStream(RECORDING_FPS);
+  return { requestFrame: null, stream };
+}
+
+function nextFrameDelay(startedAt: number) {
+  const now = performance.now();
+  const nextFrame = Math.floor((now - startedAt) / RECORDING_FRAME_MS) + 1;
+  return Math.max(0, startedAt + nextFrame * RECORDING_FRAME_MS - now);
+}
 
 function captureFilename(format: AgentCaptureFormat, size: number) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -148,8 +177,9 @@ export function useAgentCapture(
     if (session.kind === 'encoded') {
       const finalize = async () => {
         try {
-          await session.pending;
           if (session.frameIndex < 1) throw new Error('No video frames were captured.');
+          session.source.close();
+          session.stream.getTracks().forEach((track) => track.stop());
           await session.output.finalize();
           const buffer = session.output.target.buffer;
           if (!buffer?.byteLength) throw new Error('The MP4 encoder returned an empty file.');
@@ -193,42 +223,15 @@ export function useAgentCapture(
   }, [stopRecording]);
 
   const scheduleEncodedFrame = useCallback((session: EncodedSession) => {
-    const capture = async () => {
+    const capture = () => {
       if (session.stopping || sessionRef.current !== session) return;
       session.engine.renderExportFrame(session.canvas, { contentScale, transparent: false });
-      const timestamp = session.frameIndex / RECORDING_FPS;
-      await session.source.add(timestamp, 1 / RECORDING_FPS);
-      if (session.stopping || sessionRef.current !== session) return;
+      session.requestFrame?.();
       session.frameIndex += 1;
-      setRecordingSeconds(Math.floor(session.frameIndex / RECORDING_FPS));
-      const nextFrameAt = session.startedAt + session.frameIndex * RECORDING_FRAME_MS;
-      frameTimer.current = window.setTimeout(
-        () => {
-          session.pending = capture().catch((captureError) => {
-            if (!disposed.current) {
-              setError(
-                captureError instanceof Error
-                  ? captureError.message
-                  : 'The 30 FPS encoder stopped unexpectedly.',
-              );
-            }
-            stopRecordingRef.current();
-          });
-        },
-        Math.max(0, nextFrameAt - performance.now()),
-      );
+      setRecordingSeconds(Math.floor((performance.now() - session.startedAt) / 1000));
+      frameTimer.current = window.setTimeout(capture, nextFrameDelay(session.startedAt));
     };
-
-    session.pending = capture().catch((captureError) => {
-      if (!disposed.current) {
-        setError(
-          captureError instanceof Error
-            ? captureError.message
-            : 'The 30 FPS encoder stopped unexpectedly.',
-        );
-      }
-      stopRecordingRef.current();
-    });
+    capture();
   }, [contentScale]);
 
   const scheduleRecorderFrame = useCallback((session: RecorderSession) => {
@@ -237,9 +240,8 @@ export function useAgentCapture(
       session.engine.renderExportFrame(session.canvas, { contentScale, transparent: false });
       session.requestFrame?.();
       session.frameIndex += 1;
-      setRecordingSeconds(Math.floor(session.frameIndex / RECORDING_FPS));
-      const nextFrameAt = session.startedAt + session.frameIndex * RECORDING_FRAME_MS;
-      frameTimer.current = window.setTimeout(capture, Math.max(0, nextFrameAt - performance.now()));
+      setRecordingSeconds(Math.floor((performance.now() - session.startedAt) / 1000));
+      frameTimer.current = window.setTimeout(capture, nextFrameDelay(session.startedAt));
     };
     capture();
   }, [contentScale]);
@@ -255,30 +257,58 @@ export function useAgentCapture(
     canvas.width = size;
     canvas.height = size;
     engine.renderExportFrame(canvas, { contentScale, transparent: false });
+    let canvasCapture = createCanvasCaptureStream(canvas);
 
-    if (typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined') {
+    if (
+      canvasCapture
+      && typeof VideoEncoder !== 'undefined'
+      && typeof VideoFrame !== 'undefined'
+    ) {
       let output: Output<Mp4OutputFormat, BufferTarget> | null = null;
       try {
-        const { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } = await import(
-          'mediabunny'
-        );
+        const {
+          BufferTarget,
+          MediaStreamVideoTrackSource,
+          Mp4OutputFormat,
+          Output,
+          Quality,
+        } = await import('mediabunny');
         output = new Output({
           format: new Mp4OutputFormat(),
           target: new BufferTarget(),
         });
-        const source = new CanvasSource(canvas, {
-          codec: 'avc',
-          keyFrameInterval: 2,
-          latencyMode: 'realtime',
-          quality: new Quality({
-            bitrate: scale === 1 ? 4_000_000 : scale === 2 ? 8_000_000 : 12_000_000,
-            bitrateMode: 'variable',
-          }),
+        const videoTrack = canvasCapture.stream.getVideoTracks()[0];
+        if (!videoTrack) throw new Error('The canvas did not provide a video track.');
+        const source = new MediaStreamVideoTrackSource(
+          videoTrack,
+          {
+            codec: 'avc',
+            keyFrameInterval: 2,
+            quality: new Quality({
+              bitrate: scale === 1 ? 4_000_000 : scale === 2 ? 8_000_000 : 12_000_000,
+              bitrateMode: 'variable',
+            }),
+          },
+          { frameRate: RECORDING_FPS, timestampBase: 'zero' },
+        );
+        let activeSession: EncodedSession | null = null;
+        void source.errorPromise.catch((captureError) => {
+          if (!activeSession || activeSession.stopping || sessionRef.current !== activeSession) return;
+          if (!disposed.current) {
+            setError(
+              captureError instanceof Error
+                ? captureError.message
+                : 'The real-time MP4 encoder stopped unexpectedly.',
+            );
+          }
+          stopRecordingRef.current();
         });
+        source.pause();
         output.addVideoTrack(source, { frameRate: RECORDING_FPS });
         await output.start();
         if (disposed.current) {
           await output.cancel();
+          canvasCapture.stream.getTracks().forEach((track) => track.stop());
           return;
         }
         const session: EncodedSession = {
@@ -287,16 +317,21 @@ export function useAgentCapture(
           frameIndex: 0,
           kind: 'encoded',
           output,
-          pending: Promise.resolve(),
+          requestFrame: canvasCapture.requestFrame,
           source,
           startedAt: performance.now(),
           stopping: false,
+          stream: canvasCapture.stream,
         };
+        activeSession = session;
         sessionRef.current = session;
         setPhase('recording');
+        source.resume();
         scheduleEncodedFrame(session);
         return;
       } catch {
+        canvasCapture.stream.getTracks().forEach((track) => track.stop());
+        canvasCapture = createCanvasCaptureStream(canvas);
         if (output) {
           try {
             await output.cancel();
@@ -308,28 +343,14 @@ export function useAgentCapture(
     }
 
     const mimeType = mp4RecorderMimeType();
-    const canCaptureCanvas = typeof HTMLCanvasElement.prototype.captureStream === 'function';
-    if (!mimeType || !canCaptureCanvas) {
+    if (!mimeType || !canvasCapture) {
       setError('MP4 recording is unavailable in this browser.');
       setPhase('idle');
       return;
     }
 
     try {
-      let stream = canvas.captureStream(0);
-      const canvasTrack = stream.getVideoTracks()[0] as
-        | CanvasCaptureMediaStreamTrack
-        | undefined;
-      const manualFrameTrack =
-        canvasTrack && typeof canvasTrack.requestFrame === 'function' ? canvasTrack : null;
-      let requestFrame =
-        manualFrameTrack ? () => manualFrameTrack.requestFrame() : null;
-      if (!requestFrame) {
-        stream.getTracks().forEach((track) => track.stop());
-        stream = canvas.captureStream(RECORDING_FPS);
-        requestFrame = null;
-      }
-      const recorder = new MediaRecorder(stream, {
+      const recorder = new MediaRecorder(canvasCapture.stream, {
         mimeType,
         videoBitsPerSecond: scale === 1 ? 4_000_000 : scale === 2 ? 8_000_000 : 12_000_000,
       });
@@ -340,10 +361,10 @@ export function useAgentCapture(
         frameIndex: 0,
         kind: 'recorder',
         recorder,
-        requestFrame,
+        requestFrame: canvasCapture.requestFrame,
         startedAt: performance.now(),
         stopping: false,
-        stream,
+        stream: canvasCapture.stream,
       };
       recorder.ondataavailable = (event) => {
         if (event.data.size) session.chunks.push(event.data);
@@ -367,6 +388,7 @@ export function useAgentCapture(
       setPhase('recording');
       scheduleRecorderFrame(session);
     } catch (captureError) {
+      canvasCapture.stream.getTracks().forEach((track) => track.stop());
       setError(captureError instanceof Error ? captureError.message : 'MP4 recording could not start.');
       setPhase('idle');
     }
@@ -397,6 +419,7 @@ export function useAgentCapture(
       if (!session) return;
       session.stopping = true;
       if (session.kind === 'encoded') {
+        session.stream.getTracks().forEach((track) => track.stop());
         void session.output.cancel();
       } else {
         session.recorder.ondataavailable = null;

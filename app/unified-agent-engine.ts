@@ -45,6 +45,8 @@ const FACE_SPHERE_RADIUS = 42;
 const BURST_DURATION = 1_000;
 const REPEL_RADIUS = 13;
 const REPEL_FORCE = 520;
+const MAX_FRAME_CATCHUP_SECONDS = 0.25;
+const PHYSICS_STEP_SECONDS = 1 / 60;
 const STEP_SCENES: readonly AgentScene[] = ['agent', 'fast', 'agent', 'collapse'];
 
 export const UNIFIED_AGENT_EXPORT_SIZE = 360;
@@ -741,16 +743,34 @@ export class UnifiedAgentEngine {
   }
 
   private tick = (time: number) => {
-    const delta = this.lastTime ? Math.min(1 / 30, (time - this.lastTime) / 1000) : 0;
+    const frameDelta = this.lastTime
+      ? Math.min(MAX_FRAME_CATCHUP_SECONDS, (time - this.lastTime) / 1000)
+      : 0;
     this.lastTime = time;
     const elapsed = time - this.sceneStarted;
     if (!this.prefersReducedMotion.matches) {
       this.flushPointer();
+      let transitioned = false;
       if (elapsed >= STEP_DURATION) {
-        if (this.manualScene === null) this.beginScene(time);
-        else if (this.manualScene === 'collapse') this.transitionTo('collapse', time);
+        if (this.manualScene === null) {
+          this.beginScene(time);
+          transitioned = true;
+        } else if (this.manualScene === 'collapse') {
+          this.transitionTo('collapse', time);
+          transitioned = true;
+        }
       }
-      this.update(time, delta);
+      if (transitioned || frameDelta === 0) {
+        this.update(time, Math.min(frameDelta, PHYSICS_STEP_SECONDS));
+      } else {
+        const stepCount = Math.ceil(frameDelta / PHYSICS_STEP_SECONDS);
+        const stepDelta = frameDelta / stepCount;
+        const catchupStarted = time - frameDelta * 1000;
+        for (let step = 1; step <= stepCount; step += 1) {
+          const stepTime = mix(catchupStarted, time, step / stepCount);
+          this.update(stepTime, stepDelta);
+        }
+      }
     }
     this.draw();
     this.frame = requestAnimationFrame(this.tick);
