@@ -68,9 +68,10 @@ Canvas `multiply` composite mode against that field, creating the requested
 soft, spongy color interaction without recoloring their source paint. Dark mode
 lightens the selected field color enough to keep the black agent legible.
 
-Six supplied 300-series field colors—Amber `#EBC580`, Red `#DC7273`, Pink
-`#F74FCA`, Purple `#AF2FFF`, Blue `#72A3DC`, and Green `#72DC8E`—sit beside a
-native full-spectrum picker, with Blue as the default. The radial feather now
+Six supplied 300-series field colors are rendered at 120% of their original HSL
+saturation: Amber `#F6C875`, Red `#E76769`, Pink `#FF47CE`, Purple `#AF2FFF`,
+Blue `#67A2E7`, and Green `#67E789`. They sit beside a native full-spectrum
+picker, with Blue as the default. The radial feather now
 begins close to the center and falls through five stops, creating a longer,
 softer inward diffusion. The previous optional glow is removed.
 Top controls and the single horizontal bottom control bar use flat neutral

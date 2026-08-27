@@ -38,14 +38,14 @@ const SEQUENCE_STEPS: ReadonlyArray<{
   { carouselIndex: 2, label: 'Contract', scene: 'collapse' },
 ];
 const AUTOPLAY_MS = 3_000;
-const DEFAULT_ACCENT = '#72A3DC';
+const DEFAULT_ACCENT = '#67A2E7';
 const COLOR_PRESETS = [
-  { label: 'Amber 300', value: '#EBC580' },
-  { label: 'Red 300', value: '#DC7273' },
-  { label: 'Pink 300', value: '#F74FCA' },
+  { label: 'Amber 300', value: '#F6C875' },
+  { label: 'Red 300', value: '#E76769' },
+  { label: 'Pink 300', value: '#FF47CE' },
   { label: 'Purple 300', value: '#AF2FFF' },
-  { label: 'Blue 300', value: '#72A3DC' },
-  { label: 'Green 300', value: '#72DC8E' },
+  { label: 'Blue 300', value: '#67A2E7' },
+  { label: 'Green 300', value: '#67E789' },
 ] as const;
 
 function useReducedMotion() {

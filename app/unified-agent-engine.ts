@@ -396,7 +396,7 @@ function assignNearest(nodes: Node[], targets: Target[]) {
 }
 
 export class UnifiedAgentEngine {
-  private accentColor = '#72A3DC';
+  private accentColor = '#67A2E7';
   private burstStarted = Number.NEGATIVE_INFINITY;
   private burstTimer = 0;
   private canvas: HTMLCanvasElement;
