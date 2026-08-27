@@ -38,14 +38,14 @@ const SEQUENCE_STEPS: ReadonlyArray<{
   { carouselIndex: 2, label: 'Contract', scene: 'collapse' },
 ];
 const AUTOPLAY_MS = 3_000;
-const DEFAULT_ACCENT = '#102A9B';
+const DEFAULT_ACCENT = '#72A3DC';
 const COLOR_PRESETS = [
-  { label: 'Cobalt', value: '#102A9B' },
-  { label: 'Rust', value: '#9E2108' },
-  { label: 'Green', value: '#168D24' },
-  { label: 'Mustard', value: '#9B7300' },
-  { label: 'Violet', value: '#633DE2' },
-  { label: 'Black', value: '#000000' },
+  { label: 'Amber 300', value: '#EBC580' },
+  { label: 'Red 300', value: '#DC7273' },
+  { label: 'Pink 300', value: '#F74FCA' },
+  { label: 'Purple 300', value: '#AF2FFF' },
+  { label: 'Blue 300', value: '#72A3DC' },
+  { label: 'Green 300', value: '#72DC8E' },
 ] as const;
 
 function useReducedMotion() {
@@ -141,7 +141,6 @@ function AgentCanvas({
   accentColor,
   decorative = false,
   detail,
-  glowEnabled,
   label,
   onSequenceStepChange,
   onPointerEnter,
@@ -152,7 +151,6 @@ function AgentCanvas({
   accentColor: string;
   decorative?: boolean;
   detail: UnifiedAgentDetail;
-  glowEnabled: boolean;
   label: string;
   onSequenceStepChange?: (step: UnifiedAgentSequenceStep) => void;
   onPointerEnter: () => void;
@@ -187,7 +185,6 @@ function AgentCanvas({
 
   useEffect(() => engineRef.current?.setDetail(detail), [detail]);
   useEffect(() => engineRef.current?.setAccentColor(accentColor), [accentColor]);
-  useEffect(() => engineRef.current?.setGlow(glowEnabled), [glowEnabled]);
   useEffect(() => engineRef.current?.setTheme(theme), [theme]);
   useEffect(() => engineRef.current?.setVariant(variant), [variant]);
   useEffect(() => {
@@ -210,7 +207,6 @@ export function UnifiedAgent() {
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [carouselStep, setCarouselStep] = useState<UnifiedAgentSequenceStep>(0);
   const [detail, setDetail] = useState<UnifiedAgentDetail>(1);
-  const [glowEnabled, setGlowEnabled] = useState(false);
   const [requestedStep, setRequestedStep] = useState<{
     id: number;
     step: UnifiedAgentSequenceStep;
@@ -343,8 +339,7 @@ export function UnifiedAgent() {
           <AgentCanvas
             accentColor={accentColor}
             detail={detail}
-            glowEnabled={glowEnabled}
-            label="A rotating particle agent whose dots flow around two solid oval eyes"
+            label="A black-eyed rotating particle agent over a feathered color field"
             onSequenceStepChange={setActiveSequenceStep}
             onPointerEnter={() => {
               if (soundEnabled) playHoverSignature('agent');
@@ -389,7 +384,6 @@ export function UnifiedAgent() {
                   accentColor={accentColor}
                   decorative
                   detail={detail}
-                  glowEnabled={glowEnabled}
                   label=""
                   onPointerEnter={() => {
                     if (soundEnabled) playHoverSignature(state);
@@ -426,6 +420,8 @@ export function UnifiedAgent() {
           })}
         </div>
 
+        <span className="bottom-controls-divider" aria-hidden="true" />
+
         <div className="agent-utility-controls">
           <div className="detail-controls" role="group" aria-label="Agent display size">
             {([1, 2, 4] as const).map((value) => (
@@ -445,7 +441,9 @@ export function UnifiedAgent() {
             ))}
           </div>
 
-          <div className="color-controls" role="group" aria-label="Agent color">
+          <span className="bottom-controls-divider" aria-hidden="true" />
+
+          <div className="color-controls" role="group" aria-label="Agent field color">
             {COLOR_PRESETS.map(({ label, value }) => {
               const active = accentColor.toUpperCase() === value;
               return (
@@ -453,7 +451,7 @@ export function UnifiedAgent() {
                   key={value}
                   type="button"
                   className={active ? 'is-active' : ''}
-                  aria-label={`Use ${label} palette`}
+                  aria-label={`Use ${label} field`}
                   aria-pressed={active}
                   onClick={() => {
                     if (!active && soundEnabled) playControlSound('tick', 0.07);
@@ -472,7 +470,7 @@ export function UnifiedAgent() {
               <input
                 type="color"
                 value={accentColor}
-                aria-label="Choose custom agent color"
+                aria-label="Choose custom field color"
                 onInput={(event) => setAccentColor(event.currentTarget.value.toUpperCase())}
               />
               <span
@@ -482,19 +480,6 @@ export function UnifiedAgent() {
               />
             </label>
           </div>
-
-          <button
-            type="button"
-            className={`glow-toggle ${glowEnabled ? 'is-active' : ''}`}
-            aria-label={glowEnabled ? 'Disable faint accent glow' : 'Enable faint accent glow'}
-            aria-pressed={glowEnabled}
-            onClick={() => {
-              if (soundEnabled) playControlSound('bloom', 0.08);
-              setGlowEnabled((current) => !current);
-            }}
-          >
-            <span aria-hidden="true" />
-          </button>
         </div>
       </div>
     </main>

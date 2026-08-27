@@ -114,7 +114,8 @@ function blendHex(color: string, background: string, amount: number) {
   const source = hexChannels(color);
   const destination = hexChannels(background);
   const channel = (from: number, to: number) => Math.round(mix(from, to, amount));
-  return `rgb(${channel(source.red, destination.red)} ${channel(source.green, destination.green)} ${channel(source.blue, destination.blue)})`;
+  const toHex = (value: number) => value.toString(16).padStart(2, '0');
+  return `#${toHex(channel(source.red, destination.red))}${toHex(channel(source.green, destination.green))}${toHex(channel(source.blue, destination.blue))}`;
 }
 
 function hexToRgba(color: string, alpha: number) {
@@ -395,7 +396,7 @@ function assignNearest(nodes: Node[], targets: Target[]) {
 }
 
 export class UnifiedAgentEngine {
-  private accentColor = '#102A9B';
+  private accentColor = '#72A3DC';
   private burstStarted = Number.NEGATIVE_INFINITY;
   private burstTimer = 0;
   private canvas: HTMLCanvasElement;
@@ -409,7 +410,7 @@ export class UnifiedAgentEngine {
     targetX: 0,
     targetY: 0,
   };
-  private glowEnabled = false;
+  private fieldRadius = FACE_SPHERE_RADIUS + 7;
   private interactive: boolean;
   private lastTime = 0;
   private manualScene: AgentScene | null = null;
@@ -509,11 +510,6 @@ export class UnifiedAgentEngine {
     const normalized = normalizeHex(color);
     if (!normalized) return;
     this.accentColor = normalized;
-    this.draw();
-  }
-
-  setGlow(enabled: boolean) {
-    this.glowEnabled = enabled;
     this.draw();
   }
 
@@ -776,24 +772,76 @@ export class UnifiedAgentEngine {
   private draw() {
     const context = this.context;
     const background = BACKGROUNDS[this.theme];
-    const dimmedColor = blendHex(
-      this.accentColor,
-      background,
-      this.theme === 'light' ? 0.72 : 0.44,
-    );
-    context.globalAlpha = this.scene === 'fast' ? 0.19 : 1;
-    context.shadowBlur = 0;
+    const fieldColor =
+      this.theme === 'dark' ? blendHex(this.accentColor, '#FFFFFF', 0.14) : this.accentColor;
+    const extents = this.nodes
+      .map((node) => Math.hypot(node.x, node.y) + Math.max(node.radiusX, node.radiusY))
+      .sort((a, b) => a - b);
+    const representativeExtent = extents[Math.floor(extents.length * 0.84)] ?? FACE_SPHERE_RADIUS;
+    const targetFieldRadius =
+      this.scene === 'collapse'
+        ? clamp(representativeExtent + 5.5, 14, FACE_SPHERE_RADIUS + 11)
+        : FACE_SPHERE_RADIUS + 7;
+    this.fieldRadius = mix(this.fieldRadius, targetFieldRadius, this.scene === 'collapse' ? 0.16 : 0.09);
+
+    context.globalCompositeOperation = 'source-over';
+    context.globalAlpha = 1;
     context.fillStyle = background;
     context.fillRect(0, 0, LOGICAL_SIZE, LOGICAL_SIZE);
-    if (this.glowEnabled) {
-      context.shadowColor = hexToRgba(this.accentColor, 0.34);
-      context.shadowBlur = 2.7;
-    }
+
+    const field = context.createRadialGradient(
+      CENTER,
+      CENTER,
+      0,
+      CENTER,
+      CENTER,
+      this.fieldRadius,
+    );
+    const fieldAlpha = this.theme === 'light' ? 0.5 : 0.94;
+    field.addColorStop(0, hexToRgba(fieldColor, fieldAlpha));
+    field.addColorStop(0.22, hexToRgba(fieldColor, fieldAlpha * 0.98));
+    field.addColorStop(0.48, hexToRgba(fieldColor, fieldAlpha * 0.78));
+    field.addColorStop(0.7, hexToRgba(fieldColor, fieldAlpha * 0.48));
+    field.addColorStop(0.88, hexToRgba(fieldColor, fieldAlpha * 0.16));
+    field.addColorStop(1, hexToRgba(fieldColor, 0));
+    context.globalAlpha = 1;
+    context.fillStyle = field;
+    context.beginPath();
+    context.arc(CENTER, CENTER, this.fieldRadius, 0, TAU);
+    context.fill();
 
     const ordered = [...this.nodes].sort((a, b) => a.z - b.z);
+    if (this.scene === 'fast') {
+      const trailSteps = 6;
+      context.globalCompositeOperation = 'multiply';
+      context.fillStyle = '#777777';
+      for (const node of ordered) {
+        if (node.slot < 2) continue;
+        const speed = Math.hypot(node.velocityX, node.velocityY);
+        if (speed < 0.01) continue;
+        const directionX = node.velocityX / speed;
+        const directionY = node.velocityY / speed;
+        const trailLength = clamp(speed * 0.052, 4.5, 15);
+        const radius = clamp((node.radiusX + node.radiusY) * 0.5, 0.34, 5.2);
+        for (let step = trailSteps; step >= 1; step -= 1) {
+          const progress = step / (trailSteps + 1);
+          context.globalAlpha = node.alpha * Math.pow(1 - progress, 1.65) * 0.34;
+          context.beginPath();
+          context.arc(
+            CENTER + node.x - directionX * trailLength * progress,
+            CENTER + node.y - directionY * trailLength * progress,
+            radius * mix(0.72, 0.96, 1 - progress),
+            0,
+            TAU,
+          );
+          context.fill();
+        }
+      }
+    }
     for (const node of ordered) {
       context.globalAlpha = node.alpha;
-      context.fillStyle = node.slot < 2 ? this.accentColor : dimmedColor;
+      context.globalCompositeOperation = node.slot < 2 ? 'source-over' : 'multiply';
+      context.fillStyle = node.slot < 2 ? '#000000' : '#777777';
       context.beginPath();
       context.ellipse(
         CENTER + node.x,
@@ -807,6 +855,6 @@ export class UnifiedAgentEngine {
       context.fill();
     }
     context.globalAlpha = 1;
-    context.shadowBlur = 0;
+    context.globalCompositeOperation = 'source-over';
   }
 }

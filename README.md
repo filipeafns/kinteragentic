@@ -31,8 +31,9 @@ Auto is deterministic: `Idle → Thinking → Idle → Contract → repeat`. Eve
 step lasts three seconds, and the four-step timeline below the agent shows the
 current step by number and name.
 Fast mode rotates the full eyed sphere at roughly seven times normal speed,
-adds short frame persistence, and alternates the two eye closures while the head
-orbits slightly. Collapse captures every node's current position and multiplies
+adds short dot-only decay trails, and alternates the two eye closures while the head
+orbits slightly. The canvas background and feathered field are redrawn opaquely,
+so Thinking keeps the same clean color treatment as Idle. Collapse captures every node's current position and multiplies
 both axes by the same radial scale. A deterministic per-node delay creates the
 sucked-in stagger. The eye ellipses circularize as all 28 nodes converge into a
 nearly singular core, then every node expands back to its captured face position
@@ -58,14 +59,24 @@ updates are coalesced into the next animation frame. Decorative carousel
 canvases no longer register global pointer handlers, and control sounds are
 deferred outside the originating event callback to keep UI input responsive.
 
-Light mode is the default. The eyes use the selected accent at full strength,
-while the sphere dots blend that accent 72% toward the white Canvas surface.
-Six quick palettes—cobalt, rust, green, mustard, violet, and black—sit beside a
-native full-spectrum picker. Dark mode keeps the same dual-tone logic with a
-shallower 44% background blend for legibility. The optional glow follows the
-selected accent. Every card Canvas paints the same solid
-surface as its container, so there is no inset Canvas square or transparency
-seam.
+Light mode is the default. The agent itself is neutral: both eye ellipses are
+pure black and all sphere dots start from `#777777`. The chosen accent now
+belongs to a radial field behind the agent. Its solid inner area matches the
+resting sphere and feathers to zero at the outer edge; only the Contract state
+shrinks and expands the field with the particle composition. Gray dots use the
+Canvas `multiply` composite mode against that field, creating the requested
+soft, spongy color interaction without recoloring their source paint. Dark mode
+lightens the selected field color enough to keep the black agent legible.
+
+Six supplied 300-series field colors—Amber `#EBC580`, Red `#DC7273`, Pink
+`#F74FCA`, Purple `#AF2FFF`, Blue `#72A3DC`, and Green `#72DC8E`—sit beside a
+native full-spectrum picker, with Blue as the default. The radial feather now
+begins close to the center and falls through five stops, creating a longer,
+softer inward diffusion. The previous optional glow is removed.
+Top controls and the single horizontal bottom control bar use flat neutral
+surfaces without borders, outlines, glass blur, or drop shadows. Compact widths
+retain the same full control set, replacing repeated timeline labels with their
+accessible step numbers so the bar never stacks or creates page overflow.
 
 ## Audio
 
